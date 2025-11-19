@@ -70,8 +70,20 @@ app.get("/api/aidesoignants", async (req, res) => {
     }
 });
 
+app.get("/api/aidesoignants/:id", async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request()
+            .input("id", sql.VarChar, req.params.id)
+            .query("SELECT * FROM AideSoignant WHERE id_aide_soignant = @id");
+        res.json(result.recordset[0] || null);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post("/api/aidesoignants", async (req, res) => {
-    const { id_aide_soignant, mot_de_passe, nomFamille, prenom } = req.body;
+    const { id_aide_soignant, mot_de_passe, nomFamille, prenom, date_naissance, sexe, adresse_postale, adresse_electronique } = req.body;
     try {
         const pool = await getPool();
         await pool.request()
@@ -79,9 +91,13 @@ app.post("/api/aidesoignants", async (req, res) => {
             .input("pwd", sql.VarChar, mot_de_passe)
             .input("nom", sql.VarChar, nomFamille)
             .input("prenom", sql.VarChar, prenom)
+            .input("date_naissance", sql.Date, date_naissance)
+            .input("sexe", sql.VarChar, sexe)
+            .input("adresse_postale", sql.VarChar, adresse_postale)
+            .input("adresse_electronique", sql.VarChar, adresse_electronique)
             .query(`
-                INSERT INTO AideSoignant(id_aide_soignant, mot_de_passe, nomFamille, prenom)
-                VALUES (@id, @pwd, @nom, @prenom)
+                INSERT INTO AideSoignant(id_aide_soignant, mot_de_passe, nomFamille, prenom, date_naissance, sexe, adresse_postale, adresse_electronique )
+                VALUES (@id, @pwd, @nom, @prenom, @date_naissance, @sexe, @adresse_postale, @adresse_electronique)
             `);
 
         res.json({ message: "Aide-soignant créé" });
@@ -96,6 +112,43 @@ app.get("/api/medecins", async (req, res) => {
         const pool = await getPool();
         const result = await pool.request().query("SELECT * FROM Medecin");
         res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get("/api/medecins/:id", async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request()
+            .input("id", sql.VarChar, req.params.id)
+            .query("SELECT * FROM Medecin WHERE id_medecin = @id");
+        res.json(result.recordset[0] || null);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post("/api/medecin", async (req, res) => {
+    const { id_medecin, mot_de_passe, nomFamille, prenom, date_naissance, sexe, adresse_postale, adresse_electronique } = req.body;
+
+    try {
+        const pool = await getPool();
+        await pool.request()
+            .input("id", sql.VarChar, id_patient)
+            .input("pwd", sql.VarChar, mot_de_passe)
+            .input("nom", sql.VarChar, nomFamille)
+            .input("prenom", sql.VarChar, prenom)
+            .input("date_naissance", sql.Date, date_naissance)
+            .input("sexe", sql.VarChar, sexe)
+            .input("adresse_postale", sql.VarChar, adresse_postale)
+            .input("adresse_electronique", sql.VarChar, adresse_electronique)
+            .query(`
+                INSERT INTO Patient(id_medecin, mot_de_passe, nomFamille, prenom, date_naissance, sexe, adresse_postale, adresse_electronique)
+                VALUES (@id, @pwd, @nom, @prenom, @date_naissance, @sexe, @adresse_postale, @adresse_electronique)
+            `);
+
+        res.json({ message: "Patient ajouté" });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -125,7 +178,7 @@ app.get("/api/patients/:id", async (req, res) => {
 });
 
 app.post("/api/patients", async (req, res) => {
-    const { id_patient, mot_de_passe, nomFamille, prenom, fk_aide_soignant, fk_medecin_traitant } = req.body;
+    const { id_patient, mot_de_passe, nomFamille, prenom,date_naissance, sexe, adresse_postale, adresse_electronique, fk_aide_soignant, fk_medecin_traitant } = req.body;
 
     try {
         const pool = await getPool();
@@ -134,11 +187,15 @@ app.post("/api/patients", async (req, res) => {
             .input("pwd", sql.VarChar, mot_de_passe)
             .input("nom", sql.VarChar, nomFamille)
             .input("prenom", sql.VarChar, prenom)
+            .input("date_naissance", sql.Date, date_naissance)
+            .input("sexe", sql.VarChar, sexe)
+            .input("adresse_postale", sql.VarChar, adresse_postale)
+            .input("adresse_electronique", sql.VarChar, adresse_electronique)
             .input("fkaso", sql.VarChar, fk_aide_soignant)
             .input("fkmed", sql.VarChar, fk_medecin_traitant)
             .query(`
-                INSERT INTO Patient(id_patient, mot_de_passe, nomFamille, prenom, fk_aide_soignant, fk_medecin_traitant)
-                VALUES (@id, @pwd, @nom, @prenom, @fkaso, @fkmed)
+                INSERT INTO Patient( id_patient, mot_de_passe, nomFamille, prenom,date_naissance, sexe, adresse_postale, adresse_electronique, fk_aide_soignant, fk_medecin_traitant)
+                VALUES (@id, @pwd, @nom, @prenom, @date_naissance, @sexe, @adresse_postale, @adresse_electronique, @fkaso, @fkmed)
             `);
 
         res.json({ message: "Patient ajouté" });
