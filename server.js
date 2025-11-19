@@ -10,16 +10,13 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
-/*
-  IMPORTANT: put secrets in App Service Configuration (not in .env for production).
-  In local dev, create a .env with the values below for testing.
-*/
-
-// config via env
+// =====================
+//   DB CONFIG
+// =====================
 const dbConfig = {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
-    server: process.env.DB_SERVER, // ex: myserver.database.windows.net
+    server: process.env.DB_SERVER,
     database: process.env.DB_NAME,
     options: {
         encrypt: true,
@@ -32,33 +29,176 @@ const dbConfig = {
     }
 };
 
-// create a single global pool
+// pool unique
 let poolPromise = null;
 async function getPool() {
     if (!poolPromise) {
         poolPromise = sql.connect(dbConfig);
-        // handle initial connect errors
         poolPromise.catch(err => {
-            console.error("Initial DB connection error:", err);
+            console.error("DB init error:", err);
             poolPromise = null;
         });
     }
     return poolPromise;
 }
 
-// sample route
-app.get("/api/test", async (req, res) => {
+// =====================
+// 🔐 API KEY MIDDLEWARE
+// =====================
+function apiKeyAuth(req, res, next) {
+    const key = req.headers["x-api-key"];
+    if (!key || key !== process.env.API_KEY) {
+        return res.status(401).json({ error: "Unauthorized: invalid API key" });
+    }
+    next();
+}
+
+app.use('/api', apiKeyAuth); // TOUTES les routes /api protégées
+
+// =====================
+//  ROUTES API
+// =====================
+
+// ---------- AIDE SOIGNANT ----------
+app.get("/api/aidesoignants", async (req, res) => {
     try {
         const pool = await getPool();
-        const result = await pool.request().query("SELECT * FROM TestItems;"); // adapte la table
+        const result = await pool.request().query("SELECT * FROM AideSoignant");
         res.json(result.recordset);
     } catch (err) {
-        console.error(err);0
-        res.status(500).json({ error: "DB error", details: err.message });
+        res.status(500).json({ error: err.message });
     }
 });
 
-// health
+app.post("/api/aidesoignants", async (req, res) => {
+    const { id_aide_soignant, mot_de_passe, nomFamille, prenom } = req.body;
+    try {
+        const pool = await getPool();
+        await pool.request()
+            .input("id", sql.VarChar, id_aide_soignant)
+            .input("pwd", sql.VarChar, mot_de_passe)
+            .input("nom", sql.VarChar, nomFamille)
+            .input("prenom", sql.VarChar, prenom)
+            .query(`
+                INSERT INTO AideSoignant(id_aide_soignant, mot_de_passe, nomFamille, prenom)
+                VALUES (@id, @pwd, @nom, @prenom)
+            `);
+
+        res.json({ message: "Aide-soignant créé" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ---------- MEDECINS ----------
+app.get("/api/medecins", async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request().query("SELECT * FROM Medecin");
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ---------- PATIENTS ----------
+app.get("/api/patients", async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request().query("SELECT * FROM Patient");
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get("/api/patients/:id", async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request()
+            .input("id", sql.VarChar, req.params.id)
+            .query("SELECT * FROM Patient WHERE id_patient = @id");
+        res.json(result.recordset[0] || null);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post("/api/patients", async (req, res) => {
+    const { id_patient, mot_de_passe, nomFamille, prenom, fk_aide_soignant, fk_medecin_traitant } = req.body;
+
+    try {
+        const pool = await getPool();
+        await pool.request()
+            .input("id", sql.VarChar, id_patient)
+            .input("pwd", sql.VarChar, mot_de_passe)
+            .input("nom", sql.VarChar, nomFamille)
+            .input("prenom", sql.VarChar, prenom)
+            .input("fkaso", sql.VarChar, fk_aide_soignant)
+            .input("fkmed", sql.VarChar, fk_medecin_traitant)
+            .query(`
+                INSERT INTO Patient(id_patient, mot_de_passe, nomFamille, prenom, fk_aide_soignant, fk_medecin_traitant)
+                VALUES (@id, @pwd, @nom, @prenom, @fkaso, @fkmed)
+            `);
+
+        res.json({ message: "Patient ajouté" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ---------- PRESCRIPTIONS ----------
+app.get("/api/prescriptions/:patientId", async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request()
+            .input("idp", sql.VarChar, req.params.patientId)
+            .query("SELECT * FROM Prescription WHERE id_patient = @idp ORDER BY date_prescription DESC");
+
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post("/api/prescriptions", async (req, res) => {
+    const { id_patient, id_medecin, date_prescription, commentaire } = req.body;
+
+    try {
+        const pool = await getPool();
+        await pool.request()
+            .input("idp", sql.VarChar, id_patient)
+            .input("idm", sql.VarChar, id_medecin)
+            .input("date", sql.Date, date_prescription)
+            .input("com", sql.VarChar, commentaire)
+            .query(`
+                INSERT INTO Prescription(id_patient, id_medecin, date_prescription, commentaire)
+                VALUES (@idp, @idm, @date, @com)
+            `);
+
+        res.json({ message: "Prescription ajoutée" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ---------- MEDOC PATIENT ----------
+app.get("/api/medocs/:patientId", async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request()
+            .input("id", sql.VarChar, req.params.patientId)
+            .query("SELECT * FROM MedocPatient WHERE fk_patient = @id");
+
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// =====================
+// HEALTHCHECK
+// =====================
 app.get("/health", (req, res) => res.send("OK"));
 
 const port = process.env.PORT || 3000;
