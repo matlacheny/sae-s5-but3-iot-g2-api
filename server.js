@@ -46,7 +46,7 @@ async function getPool() {
 // 🔐 API KEY MIDDLEWARE
 // =====================
 function apiKeyAuth(req, res, next) {
-    const key = req.headers["x-api-key"];
+    const key = req.headers["api_key"];
     if (!key || key !== process.env.API_KEY) {
         return res.status(401).json({ error: "Unauthorized: invalid API key" });
     }
