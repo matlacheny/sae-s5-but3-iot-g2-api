@@ -144,7 +144,7 @@ app.post("/api/medecins", async (req, res) => {
             .input("adresse_postale", sql.VarChar, adresse_postale)
             .input("adresse_electronique", sql.VarChar, adresse_electronique)
             .query(`
-                INSERT INTO Patient(id_medecin, mot_de_passe, nomFamille, prenom, date_naissance, sexe, adresse_postale, adresse_electronique)
+                INSERT INTO Medecin(id_medecin, mot_de_passe, nomFamille, prenom, date_naissance, sexe, adresse_postale, adresse_electronique)
                 VALUES (@id, @pwd, @nom, @prenom, @date_naissance, @sexe, @adresse_postale, @adresse_electronique)
             `);
 
