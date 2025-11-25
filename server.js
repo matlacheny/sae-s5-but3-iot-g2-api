@@ -135,7 +135,7 @@ app.post("/api/medecin", async (req, res) => {
     try {
         const pool = await getPool();
         await pool.request()
-            .input("id", sql.VarChar, id_patient)
+            .input("id", sql.VarChar, id_medecin)
             .input("pwd", sql.VarChar, mot_de_passe)
             .input("nom", sql.VarChar, nomFamille)
             .input("prenom", sql.VarChar, prenom)
