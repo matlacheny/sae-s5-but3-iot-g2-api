@@ -204,6 +204,46 @@ app.post("/api/patients", async (req, res) => {
     }
 });
 
+app.put("/api/patients/:id", async (req, res) => {
+    const { mot_de_passe, nomFamille, prenom, date_naissance, sexe, adresse_postale, adresse_electronique, fk_aide_soignant, fk_medecin_traitant } = req.body;
+    const id = req.params.id;
+
+    try {
+        const pool = await getPool();
+        await pool.request()
+            .input("id", sql.VarChar, id)
+            .input("pwd", sql.VarChar, mot_de_passe)
+            .input("nom", sql.VarChar, nomFamille)
+            .input("prenom", sql.VarChar, prenom)
+            .input("date_naissance", sql.Date, date_naissance)
+            .input("sexe", sql.VarChar, sexe)
+            .input("adresse_postale", sql.VarChar, adresse_postale)
+            .input("adresse_electronique", sql.VarChar, adresse_electronique)
+            // On gère le cas où ces champs pourraient être vides ou null
+            .input("fkaso", sql.VarChar, fk_aide_soignant || null) 
+            .input("fkmed", sql.VarChar, fk_medecin_traitant || null)
+            .query(`
+                UPDATE Patient
+                SET 
+                    mot_de_passe = @pwd,
+                    nomFamille = @nom,
+                    prenom = @prenom,
+                    date_naissance = @date_naissance,
+                    sexe = @sexe,
+                    adresse_postale = @adresse_postale,
+                    adresse_electronique = @adresse_electronique,
+                    fk_aide_soignant = @fkaso,
+                    fk_medecin_traitant = @fkmed
+                WHERE id_patient = @id
+            `);
+
+        res.json({ message: "Patient mis à jour avec succès" });
+    } catch (err) {
+        console.error("Erreur update patient:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ---------- PRESCRIPTIONS ----------
 app.get("/api/prescriptions/:patientId", async (req, res) => {
     try {
