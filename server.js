@@ -148,7 +148,7 @@ app.post("/api/medecins", async (req, res) => {
                 VALUES (@id, @pwd, @nom, @prenom, @date_naissance, @sexe, @adresse_postale, @adresse_electronique)
             `);
 
-        res.json({ message: "Patient ajouté" });
+        res.json({ message: "Medecin ajouté" });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
