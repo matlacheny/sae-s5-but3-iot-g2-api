@@ -129,7 +129,7 @@ app.get("/api/medecins/:id", async (req, res) => {
     }
 });
 
-app.post("/api/medecin", async (req, res) => {
+app.post("/api/medecins", async (req, res) => {
     const { id_medecin, mot_de_passe, nomFamille, prenom, date_naissance, sexe, adresse_postale, adresse_electronique } = req.body;
 
     try {
