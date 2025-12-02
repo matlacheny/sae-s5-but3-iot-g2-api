@@ -293,7 +293,7 @@ app.get("/api/medocs/:patientId", async (req, res) => {
     }
 });
 
-app.post("/api/medocs/", apiKeyMiddleware, async (req, res) => {
+app.post("/api/medocs/", async (req, res) => {
     const pid = req.params.patientId;
 
     const {
@@ -350,3 +350,4 @@ app.get("/health", (req, res) => res.send("OK"));
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`API running on port ${port}`));
+
