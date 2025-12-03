@@ -374,6 +374,57 @@ app.get("/api/prescriptions/:patientId", apiKeyMiddleware, async (req, res) => {
     }
 });
 
+app.post("/api/prescriptions", apiKeyMiddleware, async (req, res) => {
+    const pid = req.params.patientId;
+
+    const {
+        heure_distrib,
+        nom_medoc,
+        quantite_totale,
+        quantite_restante,
+        compartiment
+    } = req.body;
+
+    // Vérification des données requises
+    if (!nom_medoc || !quantite_totale || !quantite_restante || !compartiment) {
+        return res.status(400).json({ error: "Champs obligatoires manquants" });
+    }
+
+    try {
+        if (!API_BASE) {
+            return res.status(500).json({ error: "API_BASE_URL non configurée" });
+        }
+
+        // Construire URL de l’API externe si besoin
+        const url = `${API_BASE}/prescriptions/${encodeURIComponent(pid)}`;
+
+        // Envoi de la requête
+        const r = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                heure_distrib,
+                nom_medoc,
+                quantite_totale,
+                quantite_restante,
+                compartiment
+            })
+        });
+
+        if (!r.ok) {
+            return res.status(r.status).json({ error: await r.text() });
+        }
+
+        const data = await r.json();
+        res.json({ success: true, data });
+
+    } catch (err) {
+        console.error("Error posting prescription:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
 // ======================
 // Start HTTP server
 // ======================
