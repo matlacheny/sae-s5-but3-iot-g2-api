@@ -21,8 +21,8 @@ RETRY_INTERVAL_MS=10000
 
 const API_KEY = process.env.API_KEY || "";
 const MQTT_URL = process.env.MQTT_URL || "mqtt://localhost:1883";
-const HTTP_PORT = parseInt(process.env.PORT || "3000", 10);
-const WS_PORT = parseInt(process.env.WS_PORT || "8080", 10);
+const HTTP_PORT = parseInt(process.env.PORT || "3200", 10);
+const WS_PORT = parseInt(process.env.WS_PORT || "8000", 10);
 const API_BASE = process.env.API_BASE_URL || "";
 const RETRY_INTERVAL_MS = parseInt(process.env.RETRY_INTERVAL_MS || "10000", 10);
 
@@ -252,10 +252,12 @@ mqttClient.on("connect", () => {
     console.log("Connected to MQTT broker:", MQTT_URL);
     // subscribe to the alert topics pattern you use
     // Example topic form: alert/box/{patientId}/{alertType}
-    mqttClient.subscribe("alert/box/+/+").then(() => {
-        console.log("Subscribed to MQTT topics: alert/box/+/+");
-    }).catch(err => {
-        console.error("MQTT subscribe error:", err);
+    mqttClient.subscribe("alert/box/+/+", (err) => {
+        if (err) {
+            console.error("MQTT subscribe error:", err);
+        } else {
+            console.log("Subscribed to MQTT topics: alert/box/+/+");
+        }
     });
 });
 

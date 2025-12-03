@@ -6,7 +6,6 @@
   "scripts": {
     "test": "echo \"Warning: no test specified\"",
     "start": "node server.js"
-
   },
   "keywords": [],
   "author": "",
@@ -17,6 +16,8 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
-    "mssql": "^12.1.0"
+    "mqtt": "^5.14.1",
+    "mssql": "^12.1.0",
+    "ws": "^8.18.3"
   }
 }
