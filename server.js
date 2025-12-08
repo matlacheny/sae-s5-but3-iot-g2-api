@@ -20,7 +20,7 @@ RETRY_INTERVAL_MS=10000
 */
 
 const API_KEY = process.env.API_KEY || "";
-const MQTT_URL = process.env.MQTT_URL || "mqtt://localhost:1883";
+const MQTT_URL = process.env.MQTT_URL || "mqtt:///5.tcp.eu.ngrok.io/14399:";
 const HTTP_PORT = parseInt(process.env.PORT || "3200", 10);
 const WS_PORT = parseInt(process.env.WS_PORT || "8000", 10);
 const API_BASE = process.env.API_BASE_URL || "";
