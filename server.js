@@ -82,6 +82,18 @@ app.get("/api/aidesoignants/:id", async (req, res) => {
     }
 });
 
+app.get("/api/aidesoignants/password/:id", async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request()
+            .input("id", sql.VarChar, req.params.id)
+            .query("SELECT mot_de_passe FROM AideSoignant WHERE id_aide_soignant = @id");
+        res.json(result.recordset[0] || null);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post("/api/aidesoignants", async (req, res) => {
     const { id_aide_soignant, mot_de_passe, nomFamille, prenom, date_naissance, sexe, adresse_postale, adresse_electronique } = req.body;
     try {
@@ -123,6 +135,18 @@ app.get("/api/medecins/:id", async (req, res) => {
         const result = await pool.request()
             .input("id", sql.VarChar, req.params.id)
             .query("SELECT * FROM Medecin WHERE id_medecin = @id");
+        res.json(result.recordset[0] || null);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get("/api/medecins/password/:id", async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request()
+            .input("id", sql.VarChar, req.params.id)
+            .query("SELECT mot_de_passe FROM Medecin WHERE id_medecin = @id");
         res.json(result.recordset[0] || null);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -171,6 +195,18 @@ app.get("/api/patients/:id", async (req, res) => {
         const result = await pool.request()
             .input("id", sql.VarChar, req.params.id)
             .query("SELECT * FROM Patient WHERE id_patient = @id");
+        res.json(result.recordset[0] || null);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get("/api/patients/password/:id", async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request()
+            .input("id", sql.VarChar, req.params.id)
+            .query("SELECT mot_de_passe FROM Patient WHERE id_patient = @id");
         res.json(result.recordset[0] || null);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -350,4 +386,5 @@ app.get("/health", (req, res) => res.send("OK"));
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`API running on port ${port}`));
+
 
