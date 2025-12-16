@@ -1,12 +1,12 @@
 # Utilisation de l'image officielle Node.js version Alpine (légère et sécurisée)
-# La version 20 correspond aux exigences de tes dépendances (package-lock.json)
+# La version 20 correspond aux exigences de tes dépendances
 FROM node:20-alpine
 
 # Création du dossier de travail dans le conteneur
 WORKDIR /app
 
 # Copie uniquement les fichiers de dépendances pour profiter du cache Docker
-COPY package.json package-lock.json ./
+COPY package.json ./
 
 # Installation propre des dépendances de production uniquement (sans devDependencies)
 # Cela réduit la taille de l'image
