@@ -66,11 +66,13 @@ async function fetchAllPatients() {
     }
     const url = `${API_BASE}/patients`;
     try {
-        const res = await fetch(url);
-        if (!res.ok) {
-            console.error("Failed to fetch patients:", res.status, await res.text());
-            return [];
-        }
+        const res = await fetch(url, {
+            method: "GET",
+            headers: {
+                "api_key": API_KEY, // On envoie la clé définie dans le .env
+                "Content-Type": "application/json"
+            }
+        });
         const data = await res.json();
         patientsCache = data;
         patientsCacheTs = Date.now();
