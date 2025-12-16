@@ -19,6 +19,8 @@ API_BASE_URL=https://apidatabasesae-aee3egcmdke2b6a2.germanywestcentral-01.azure
 RETRY_INTERVAL_MS=10000
 */
 
+// Test image docker
+
 const API_KEY = process.env.API_KEY || "";
 const MQTT_URL = process.env.MQTT_URL || "mqtt:///5.tcp.eu.ngrok.io/14399:";
 const HTTP_PORT = parseInt(process.env.PORT || "3200", 10);
