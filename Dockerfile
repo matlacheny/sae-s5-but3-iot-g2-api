@@ -6,7 +6,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Copie uniquement les fichiers de dépendances pour profiter du cache Docker
-COPY package.json ./
+COPY package.json package-lock.json ./
 
 # Installation propre des dépendances de production uniquement (sans devDependencies)
 # Cela réduit la taille de l'image
