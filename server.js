@@ -415,6 +415,74 @@ app.post("/api/prescriptions", apiKeyMiddleware, async (req, res) => {
 });
 
 // ======================
+// ENDPOINT D'AUTHENTIFICATION
+// ======================
+
+app.post("/api/auth/login", async (req, res) => {
+    const { id, password, role } = req.body;
+
+    if (!id || !password || !role) {
+        return res.status(400).json({ 
+            error: "Paramètres manquants", 
+            required: ["id", "password", "role"] 
+        });
+    }
+
+    const validRoles = ['medecins', 'patients', 'aidesoignants'];
+    if (!validRoles.includes(role)) {
+        return res.status(400).json({ 
+            error: "Rôle invalide", 
+            validRoles 
+        });
+    }
+
+    try {
+        console.log(`[AUTH] Tentative: ${role}/${id}`);
+        const apiUrl = `${API_BASE}/${role}/${id}`;
+        
+        const response = await fetch(apiUrl, {
+            method: "GET",
+            headers: {
+                "api_key": API_KEY,
+                "Content-Type": "application/json"
+            }
+        });
+
+        if (!response.ok) {
+            console.log(`[AUTH] Non trouvé: ${response.status}`);
+            return res.status(404).json({ error: "Utilisateur non trouvé" });
+        }
+
+        const userData = await response.json();
+
+        if (!userData || !userData.mot_de_passe) {
+            return res.status(404).json({ error: "Utilisateur non trouvé" });
+        }
+
+        if (userData.mot_de_passe !== password) {
+            console.log(`[AUTH] Mot de passe incorrect`);
+            return res.status(401).json({ error: "Mot de passe incorrect" });
+        }
+
+        console.log(`[AUTH] ✅ Succès: ${role}/${id}`);
+
+        res.json({
+            success: true,
+            user: userData,
+            role: role,
+            message: "Authentification réussie"
+        });
+
+    } catch (error) {
+        console.error(`[AUTH] Erreur:`, error);
+        res.status(500).json({ 
+            error: "Erreur serveur",
+            message: error.message 
+        });
+    }
+});
+
+// ======================
 // AUTOMATIC GIST UPDATE
 // ======================
 async function updateGistWithNgrok() {
@@ -499,4 +567,5 @@ async function shutdown() {
 }
 
 process.on("SIGINT", shutdown);
+
 process.on("SIGTERM", shutdown);
