@@ -480,8 +480,11 @@ async function updateGistWithNgrok() {
         }
 
     } catch (err) {
-        console.error("❌ Erreur lors de la mise à jour du Gist:", err.message);
-        console.log("💡 Vérifie que le conteneur 'ngrok' est bien lancé.");
+        console.error("❌ Erreur COMPLETE:", err); // Affiche tout l'objet erreur
+        if (err.cause) console.error("🔍 Cause:", err.cause);
+
+        // Affiche l'URL exacte que le code essaie d'appeler pour vérifier les fautes
+        console.log("🔗 URL tentée :", `https://api.github.com/gists/${GIST_ID}`);
     }
 }
 
