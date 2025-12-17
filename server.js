@@ -436,7 +436,7 @@ app.post("/api/auth/login", async (req, res) => {
     }
     
     try {
-        console.log(`[AUTH] Tentative: ${role}/${id}`);  // ✅ Parenthèse ajoutée
+        console.log(`[AUTH] Tentative: ${role}/${id}`);  
         const apiUrl = `${API_BASE}/${role}/${id}`;
         
         const response = await fetch(apiUrl, {
@@ -448,7 +448,7 @@ app.post("/api/auth/login", async (req, res) => {
         });
         
         if (!response.ok) {
-            console.log(`[AUTH] Non trouvé: ${response.status}`);  // ✅ Parenthèse ajoutée
+            console.log(`[AUTH] Non trouvé: ${response.status}`);  
             return res.status(404).json({ error: "Utilisateur non trouvé" });
         }
         
@@ -459,11 +459,11 @@ app.post("/api/auth/login", async (req, res) => {
         }
         
         if (userData.mot_de_passe !== password) {
-            console.log(`[AUTH] Mot de passe incorrect`);  // ✅ Parenthèse ajoutée
+            console.log(`[AUTH] Mot de passe incorrect`); 
             return res.status(401).json({ error: "Mot de passe incorrect" });
         }
         
-        console.log(`[AUTH] ✅ Succès: ${role}/${id}`);  // ✅ Parenthèse ajoutée
+        console.log(`[AUTH] ✅ Succès: ${role}/${id}`); 
         
         res.json({
             success: true,
@@ -473,7 +473,7 @@ app.post("/api/auth/login", async (req, res) => {
         });
         
     } catch (error) {
-        console.error(`[AUTH] Erreur:`, error);  // ✅ Parenthèse ajoutée
+        console.error(`[AUTH] Erreur:`, error); 
         res.status(500).json({ 
             error: "Erreur serveur",
             message: error.message 
@@ -568,4 +568,5 @@ async function shutdown() {
 process.on("SIGINT", shutdown);
 
 process.on("SIGTERM", shutdown);
+
 
