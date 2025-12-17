@@ -423,8 +423,8 @@ async function updateGistWithNgrok() {
         return;
     }
 
-    console.log("⏳ Attente de 5s pour l'initialisation de Ngrok...");
-    await new Promise(r => setTimeout(r, 5000)); // Attendre que Ngrok démarre
+    console.log("⏳ Attente de 15s pour l'initialisation de Ngrok...");
+    await new Promise(r => setTimeout(r, 15000)); // Attendre que Ngrok démarre
 
     try {
         // 1. Interroger l'API locale Ngrok (dans le réseau Docker)
