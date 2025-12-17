@@ -12,21 +12,27 @@ dotenv.config();
 /*
 .env attendu (exemple)
 API_KEY=supercleAPI
-MQTT_URL=mqtt://localhost:1883
-PORT=3000
-WS_PORT=8080
-API_BASE_URL=https://apidatabasesae-aee3egcmdke2b6a2.germanywestcentral-01.azurewebsites.net/api
+MQTT_URL=mqtt://mosquitto:1883
+PORT=3200
+API_BASE_URL=https://apidatabasesae-...
 RETRY_INTERVAL_MS=10000
+# Nouveaux champs pour le Gist :
+GIST_ID=aaaaaaaaaaaaaaaaa
+GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxx
 */
 
-// Test image docker
-
+// Configuration
 const API_KEY = process.env.API_KEY || "";
-const MQTT_URL = process.env.MQTT_URL || "mqtt:///5.tcp.eu.ngrok.io/14399:";
-const HTTP_PORT = parseInt(process.env.PORT || "3200", 10);
-const WS_PORT = parseInt(process.env.WS_PORT || "8000", 10);
+const MQTT_URL = process.env.MQTT_URL || "mqtt:///172.19.136.3:1883:";
+const PORT = parseInt(process.env.PORT || "3200", 10);
 const API_BASE = process.env.API_BASE_URL || "";
 const RETRY_INTERVAL_MS = parseInt(process.env.RETRY_INTERVAL_MS || "10000", 10);
+
+// --- CONFIGURATION GIST ---
+const GIST_ID = process.env.GIST_ID || "";
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "";
+// "ngrok" est le nom du service dans docker-compose
+const NGROK_API_URL = "http://ngrok:4040/api/tunnels";
 
 // ======================
 // Express + middleware
@@ -40,7 +46,6 @@ app.use(express.json());
 function apiKeyMiddleware(req, res, next) {
     const key = req.headers["api_key"];
     if (!API_KEY) {
-        // no API key configured -> dev mode, allow
         return next();
     }
     if (!key || key !== API_KEY) {
@@ -50,14 +55,13 @@ function apiKeyMiddleware(req, res, next) {
 }
 
 // ======================
-// In-memory cache for patients (to limit API calls)
+// In-memory cache for patients
 // ======================
 let patientsCache = null;
 let patientsCacheTs = 0;
-const PATIENTS_CACHE_TTL_MS = 30_000; // 30s - ajuste selon besoin
+const PATIENTS_CACHE_TTL_MS = 30_000;
 
 async function fetchAllPatients() {
-    // use cache when fresh
     const now = Date.now();
     if (patientsCache && (now - patientsCacheTs) < PATIENTS_CACHE_TTL_MS) {
         return patientsCache;
@@ -71,7 +75,7 @@ async function fetchAllPatients() {
         const res = await fetch(url, {
             method: "GET",
             headers: {
-                "api_key": API_KEY, // On envoie la clé définie dans le .env
+                "api_key": API_KEY,
                 "Content-Type": "application/json"
             }
         });
@@ -85,7 +89,6 @@ async function fetchAllPatients() {
     }
 }
 
-// helper: get aide id for a patient id by calling external API (uses cached patients list)
 async function getAideForPatient(patientId) {
     try {
         const patients = await fetchAllPatients();
@@ -100,18 +103,24 @@ async function getAideForPatient(patientId) {
 }
 
 // ======================
+// Start HTTP server
+// ======================
+const server = app.listen(PORT, () => {
+    console.log(`HTTP server running on port ${PORT}`);
+    // Lance la mise à jour du Gist après le démarrage
+    updateGistWithNgrok();
+});
+
+// ======================
 // WebSocket server + ACK management
 // ======================
 
-// map aideId -> Set(ws)
 const wsClients = new Map();
-// map aideId -> Map(alertId -> payload)
 const pendingAlerts = new Map();
 
-const wss = new WebSocketServer({ port: WS_PORT });
-console.log(`WebSocket server listening on port ${WS_PORT}`);
+const wss = new WebSocketServer({ server });
+console.log(`WebSocket server attached to HTTP server on port ${PORT}`);
 
-// helper to safely send JSON to ws
 function wsSendSafe(ws, obj) {
     try {
         if (ws.readyState === 1) ws.send(JSON.stringify(obj));
@@ -121,21 +130,18 @@ function wsSendSafe(ws, obj) {
 }
 
 wss.on("connection", async (ws, req) => {
-    // Note: The 'try' block used to be here, but we can start the logic directly.
-    // The main logic is already covered by the inner try...catch block.
-
     const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
     const token = url.searchParams.get("token");
     const aideId = url.searchParams.get("id");
     const password = url.searchParams.get("pwd");
 
     if (!aideId) {
-        wsSendSafe(ws, {error: "Missing 'id' query param (aide-soignant id)"});
+        wsSendSafe(ws, {error: "Missing 'id' query param"});
         ws.close();
         return;
     }
     if (!password) {
-        wsSendSafe(ws, {error: "Missing 'pwd' query param (password)"});
+        wsSendSafe(ws, {error: "Missing 'pwd' query param"});
         ws.close();
         return;
     }
@@ -147,7 +153,6 @@ wss.on("connection", async (ws, req) => {
     }
 
     try {
-        // --- Authentication Check ---
         const response = await fetch(
             `${API_BASE}/aidesoignants/password/${aideId}`,
             {
@@ -160,7 +165,7 @@ wss.on("connection", async (ws, req) => {
         );
 
         if (!response.ok) {
-            console.error(`[WS Auth] API call failed for aide ${aideId}:`, response.status, await response.text());
+            console.error(`[WS Auth] API call failed for aide ${aideId}:`, response.status);
             wsSendSafe(ws, {error: "Authentication failed due to API error"});
             ws.close();
             return;
@@ -174,43 +179,35 @@ wss.on("connection", async (ws, req) => {
             return;
         }
 
-        // --- Successful Authentication & Connection Registration ---
         if (!wsClients.has(aideId)) wsClients.set(aideId, new Set());
         wsClients.get(aideId).add(ws);
 
         if (!pendingAlerts.has(aideId)) pendingAlerts.set(aideId, new Map());
 
-        console.log(`Aide-soignant connected: ${aideId} (connections: ${wsClients.get(aideId).size})`);
+        console.log(`Aide-soignant connected: ${aideId}`);
 
-        // Resend pending alerts
         const queue = pendingAlerts.get(aideId);
         for (const payload of queue.values()) {
             wsSendSafe(ws, payload);
         }
 
-        // --- WebSocket Message Handlers ---
         ws.on("message", (msgBuf) => {
             let data;
             try {
                 data = JSON.parse(msgBuf.toString());
             } catch (err) {
-                console.warn("Invalid WS message (not JSON):", msgBuf.toString());
                 return;
             }
 
-            // handle ACK
             if (data && data.type === "ack" && data.alertId) {
                 const q = pendingAlerts.get(aideId);
                 if (q && q.has(data.alertId)) {
                     q.delete(data.alertId);
-                    console.log(`ACK received: alertId=${data.alertId} from aide=${aideId}`);
-                } else {
-                    console.log(`ACK for unknown alertId=${data.alertId} from aide=${aideId}`);
+                    console.log(`ACK received: alertId=${data.alertId}`);
                 }
                 return;
             }
 
-            // handle resend request
             if (data && data.type === "resend_pending") {
                 const q = pendingAlerts.get(aideId);
                 if (q) {
@@ -229,266 +226,274 @@ wss.on("connection", async (ws, req) => {
         });
 
     } catch (err) {
-        // Catch network errors, JSON parsing errors, or any exception during setup/fetch
-        console.error("[WS Auth] Authentication or setup error:", err);
-        wsSendSafe(ws, {error: "Internal server error during connection setup."});
-        try {
-            ws.close();
-        } catch (e) {
-        }
+        console.error("[WS Auth] Error:", err);
+        wsSendSafe(ws, {error: "Internal server error."});
+        try { ws.close(); } catch (e) {}
     }
 });
 
-// send an alert to an aide (stores in pendingAlerts until ACK)
-    function sendToAide(aideId, data) {
-        // ensure queue exists
-        if (!pendingAlerts.has(aideId)) pendingAlerts.set(aideId, new Map());
+function sendToAide(aideId, data) {
+    if (!pendingAlerts.has(aideId)) pendingAlerts.set(aideId, new Map());
 
-        const clients = wsClients.get(aideId);
-        if (!clients || clients.size === 0) {
-            // Save the alert in pendingAlerts even if aide is offline (will be delivered on reconnect)
-            const alertId = crypto.randomUUID();
-            const payload = {...data, alertId, timestamp: new Date().toISOString()};
-            pendingAlerts.get(aideId).set(alertId, payload);
-            console.log(`Aide ${aideId} offline - stored alert ${alertId}`);
-            return false;
-        }
+    const clients = wsClients.get(aideId);
+    const alertId = crypto.randomUUID();
+    const payload = {...data, alertId, timestamp: new Date().toISOString()};
+    pendingAlerts.get(aideId).set(alertId, payload);
 
-        // create alertId and store
-        const alertId = crypto.randomUUID();
-        const payload = {...data, alertId, timestamp: new Date().toISOString()};
-        pendingAlerts.get(aideId).set(alertId, payload);
-
-        // send to all connected ws for that aide
-        clients.forEach(ws => wsSendSafe(ws, payload));
-        console.log(`Sent alert ${alertId} to aide ${aideId} (connections: ${clients.size})`);
-        return true;
+    if (!clients || clients.size === 0) {
+        console.log(`Aide ${aideId} offline - stored alert ${alertId}`);
+        return false;
     }
 
-// retry mechanism: re-send pending alerts periodically
-    setInterval(() => {
-        try {
-            wsClients.forEach((clientSet, aideId) => {
-                const queue = pendingAlerts.get(aideId);
-                if (!queue || queue.size === 0) return;
-                for (const payload of queue.values()) {
-                    for (const ws of clientSet) {
-                        wsSendSafe(ws, payload);
-                    }
+    clients.forEach(ws => wsSendSafe(ws, payload));
+    console.log(`Sent alert ${alertId} to aide ${aideId}`);
+    return true;
+}
+
+setInterval(() => {
+    try {
+        wsClients.forEach((clientSet, aideId) => {
+            const queue = pendingAlerts.get(aideId);
+            if (!queue || queue.size === 0) return;
+            for (const payload of queue.values()) {
+                for (const ws of clientSet) {
+                    wsSendSafe(ws, payload);
                 }
-            });
-            // Also keep pendingAlerts for aides currently offline (they'll be delivered on reconnect)
-        } catch (err) {
-            console.error("Retry interval error:", err);
-        }
-    }, RETRY_INTERVAL_MS);
+            }
+        });
+    } catch (err) {
+        console.error("Retry interval error:", err);
+    }
+}, RETRY_INTERVAL_MS);
 
 // ======================
 // MQTT setup
 // ======================
-    const mqttClient = mqtt.connect(MQTT_URL);
+const mqttClient = mqtt.connect(MQTT_URL);
+let mqttConnected = false;
 
-    let mqttConnected = false;
-
-    mqttClient.on("connect", () => {
-        mqttConnected = true;
-        console.log("Connected to MQTT broker:", MQTT_URL);
-        // subscribe to the alert topics pattern you use
-        // Example topic form: alert/box/{patientId}/{alertType}
-        mqttClient.subscribe("alert/box/+/+", (err) => {
-            if (err) {
-                console.error("MQTT subscribe error:", err);
-            } else {
-                console.log("Subscribed to MQTT topics: alert/box/+/+");
-            }
-        });
+mqttClient.on("connect", () => {
+    mqttConnected = true;
+    console.log("Connected to MQTT broker:", MQTT_URL);
+    mqttClient.subscribe("alert/box/+/+", (err) => {
+        if (err) console.error("MQTT subscribe error:", err);
+        else console.log("Subscribed to MQTT topics: alert/box/+/+");
     });
+});
 
-    mqttClient.on("reconnect", () => console.log("MQTT reconnecting..."));
-    mqttClient.on("error", (err) => {
-        mqttConnected = false;
-        console.error("MQTT error:", err);
-    });
-    mqttClient.on("close", () => {
-        mqttConnected = false;
-        console.log("MQTT connection closed");
-    });
+mqttClient.on("reconnect", () => console.log("MQTT reconnecting..."));
+mqttClient.on("error", (err) => {
+    mqttConnected = false;
+    console.error("MQTT error:", err);
+});
+mqttClient.on("close", () => {
+    mqttConnected = false;
+    console.log("MQTT connection closed");
+});
 
-    mqttClient.on("message", async (topic, messageBuf) => {
-        const message = messageBuf.toString();
-        console.log(`[MQTT] ${topic} -> ${message}`);
+mqttClient.on("message", async (topic, messageBuf) => {
+    const message = messageBuf.toString();
+    console.log(`[MQTT] ${topic} -> ${message}`);
 
-        // parse topic expecting: alert/box/{patientId}/{alertType...}
-        const parts = topic.split("/").filter(Boolean);
-        if (parts.length >= 4 && parts[0] === "alert" && parts[1] === "box") {
-            const patientId = parts[2];
-            const alertType = parts.slice(3).join("/"); // support multi-segment alert types
+    const parts = topic.split("/").filter(Boolean);
+    if (parts.length >= 4 && parts[0] === "alert" && parts[1] === "box") {
+        const patientId = parts[2];
+        const alertType = parts.slice(3).join("/");
+        const aideId = await getAideForPatient(patientId);
 
-            // get aide for patient via API
-            const aideId = await getAideForPatient(patientId);
-
-            // alert payload
-            const payload = {
-                type: "box_alert",
-                patientId,
-                alertType,
-                message,
-                topic
-            };
-
-            if (aideId) {
-                sendToAide(aideId, payload);
-            } else {
-                console.log(`No aide-soignant found for patient ${patientId}; storing as unassigned or log`);
-                // optionally store in a global pending list or log for manual handling
-            }
-        } else {
-            // handle other MQTT topics if needed
-        }
-    });
-
-// ======================
-// REST endpoints (management)
-// ======================
-
-    app.get("/api/health", (req, res) => {
-        res.json({
-            status: "ok",
-            mqttConnected,
-            wsPort: WS_PORT,
-            activeAides: Array.from(wsClients.keys())
-        });
-    });
-
-// list connected clients (aideId -> count)
-    app.get("/api/clients", apiKeyMiddleware, (req, res) => {
-        const summary = {};
-        wsClients.forEach((set, aideId) => {
-            summary[aideId] = set.size;
-        });
-        res.json({clients: summary});
-    });
-
-// send manual alert to aide (useful for testing)
-    app.post("/api/send-alert", apiKeyMiddleware, (req, res) => {
-        const {aideId, patientId, alertType, message} = req.body;
-        if (!aideId || !patientId || !alertType) {
-            return res.status(400).json({error: "aideId, patientId and alertType required"});
-        }
         const payload = {
             type: "box_alert",
             patientId,
             alertType,
-            message: message || "(manual)"
+            message,
+            topic
         };
-        const sent = sendToAide(aideId, payload);
-        res.json({sent});
-    });
 
-// list patients for an aide (via remote API)
-    app.get("/api/patients/of/:aideId", apiKeyMiddleware, async (req, res) => {
-        const aideId = req.params.aideId;
-        try {
-            const all = await fetchAllPatients();
-            const myPatients = (all || []).filter(p => String(p.fk_aide_soignant) === String(aideId))
-                .map(p => ({id_patient: p.id_patient, nomFamille: p.nomFamille, prenom: p.prenom}));
-            res.json({patients: myPatients});
-        } catch (err) {
-            console.error("/api/patients/of error:", err);
-            res.status(500).json({error: "failed"});
+        if (aideId) {
+            sendToAide(aideId, payload);
+        } else {
+            console.log(`No aide-soignant found for patient ${patientId}`);
         }
-    });
-
-// optional: fetch prescriptions for a given patient via external API and return
-    app.get("/api/prescriptions/:patientId", apiKeyMiddleware, async (req, res) => {
-        const pid = req.params.patientId;
-        if (!API_BASE) return res.status(500).json({error: "API_BASE_URL not configured"});
-        try {
-            const url = `${API_BASE}/prescriptions/${encodeURIComponent(pid)}`;
-            const r = await fetch(url);
-            if (!r.ok) {
-                return res.status(r.status).json({error: await r.text()});
-            }
-            const data = await r.json();
-            res.json(data);
-        } catch (err) {
-            console.error("Error fetching prescriptions:", err);
-            res.status(500).json({error: err.message});
-        }
-    });
-
-    app.post("/api/prescriptions", apiKeyMiddleware, async (req, res) => {
-        const pid = req.params.patientId;
-
-        const {
-            heure_distrib,
-            nom_medoc,
-            quantite_totale,
-            quantite_restante,
-            compartiment
-        } = req.body;
-
-        // Vérification des données requises
-        if (!nom_medoc || !quantite_totale || !quantite_restante || !compartiment) {
-            return res.status(400).json({error: "Champs obligatoires manquants"});
-        }
-
-        try {
-            if (!API_BASE) {
-                return res.status(500).json({error: "API_BASE_URL non configurée"});
-            }
-
-            // Construire URL de l’API externe si besoin
-            const url = `${API_BASE}/prescriptions/${encodeURIComponent(pid)}`;
-
-            // Envoi de la requête
-            const r = await fetch(url, {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({
-                    heure_distrib,
-                    nom_medoc,
-                    quantite_totale,
-                    quantite_restante,
-                    compartiment
-                })
-            });
-
-            if (!r.ok) {
-                return res.status(r.status).json({error: await r.text()});
-            }
-
-            const data = await r.json();
-            res.json({success: true, data});
-
-        } catch (err) {
-            console.error("Error posting prescription:", err);
-            res.status(500).json({error: err.message});
-        }
-    });
-
+    }
+});
 
 // ======================
-// Start HTTP server
+// REST endpoints
 // ======================
-    app.listen(HTTP_PORT, () => {
-        console.log(`HTTP server running on port ${HTTP_PORT}`);
+app.get("/api/health", (req, res) => {
+    res.json({
+        status: "ok",
+        mqttConnected,
+        wsPort: PORT, // WS is on same port now
+        activeAides: Array.from(wsClients.keys())
     });
+});
 
-// graceful shutdown
-    async function shutdown() {
-        console.log("Shutting down...");
-        try {
-            mqttClient.end();
-        } catch (e) {
+app.get("/api/clients", apiKeyMiddleware, (req, res) => {
+    const summary = {};
+    wsClients.forEach((set, aideId) => {
+        summary[aideId] = set.size;
+    });
+    res.json({clients: summary});
+});
+
+app.post("/api/send-alert", apiKeyMiddleware, (req, res) => {
+    const {aideId, patientId, alertType, message} = req.body;
+    if (!aideId || !patientId || !alertType) {
+        return res.status(400).json({error: "aideId, patientId and alertType required"});
+    }
+    const payload = {
+        type: "box_alert",
+        patientId,
+        alertType,
+        message: message || "(manual)"
+    };
+    const sent = sendToAide(aideId, payload);
+    res.json({sent});
+});
+
+app.get("/api/patients/of/:aideId", apiKeyMiddleware, async (req, res) => {
+    const aideId = req.params.aideId;
+    try {
+        const all = await fetchAllPatients();
+        const myPatients = (all || []).filter(p => String(p.fk_aide_soignant) === String(aideId))
+            .map(p => ({id_patient: p.id_patient, nomFamille: p.nomFamille, prenom: p.prenom}));
+        res.json({patients: myPatients});
+    } catch (err) {
+        console.error("/api/patients/of error:", err);
+        res.status(500).json({error: "failed"});
+    }
+});
+
+app.get("/api/prescriptions/:patientId", apiKeyMiddleware, async (req, res) => {
+    const pid = req.params.patientId;
+    if (!API_BASE) return res.status(500).json({error: "API_BASE_URL not configured"});
+    try {
+        const url = `${API_BASE}/prescriptions/${encodeURIComponent(pid)}`;
+        const r = await fetch(url);
+        if (!r.ok) {
+            return res.status(r.status).json({error: await r.text()});
         }
-        try {
-            wss.close();
-        } catch (e) {
-        }
-        process.exit(0);
+        const data = await r.json();
+        res.json(data);
+    } catch (err) {
+        console.error("Error fetching prescriptions:", err);
+        res.status(500).json({error: err.message});
+    }
+});
+
+app.post("/api/prescriptions", apiKeyMiddleware, async (req, res) => {
+    const pid = req.params.patientId;
+    const { heure_distrib, nom_medoc, quantite_totale, quantite_restante, compartiment } = req.body;
+
+    if (!nom_medoc || !quantite_totale || !quantite_restante || !compartiment) {
+        return res.status(400).json({error: "Champs obligatoires manquants"});
     }
 
-    process.on("SIGINT", shutdown);
-    process.on("SIGTERM", shutdown);
+    try {
+        if (!API_BASE) {
+            return res.status(500).json({error: "API_BASE_URL non configurée"});
+        }
+        const url = `${API_BASE}/prescriptions/${encodeURIComponent(pid)}`;
+        const r = await fetch(url, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                heure_distrib, nom_medoc, quantite_totale, quantite_restante, compartiment
+            })
+        });
 
+        if (!r.ok) {
+            return res.status(r.status).json({error: await r.text()});
+        }
+        const data = await r.json();
+        res.json({success: true, data});
+    } catch (err) {
+        console.error("Error posting prescription:", err);
+        res.status(500).json({error: err.message});
+    }
+});
+
+// ======================
+// AUTOMATIC GIST UPDATE
+// ======================
+async function updateGistWithNgrok() {
+    if (!GIST_ID || !GITHUB_TOKEN) {
+        console.log("⚠️ Variables GIST_ID ou GITHUB_TOKEN manquantes. Mise à jour Gist désactivée.");
+        return;
+    }
+
+    console.log("⏳ Attente de 5s pour l'initialisation de Ngrok...");
+    await new Promise(r => setTimeout(r, 5000)); // Attendre que Ngrok démarre
+
+    try {
+        // 1. Interroger l'API locale Ngrok (dans le réseau Docker)
+        console.log(`🔍 Récupération des tunnels sur ${NGROK_API_URL}...`);
+        const ngrokRes = await fetch(NGROK_API_URL);
+
+        if (!ngrokRes.ok) {
+            throw new Error(`Erreur Ngrok API: ${ngrokRes.status}`);
+        }
+        const ngrokData = await ngrokRes.json();
+
+        // 2. Trouver les tunnels
+        const httpTunnel = ngrokData.tunnels.find(t => t.proto === 'https');
+        const tcpTunnel = ngrokData.tunnels.find(t => t.proto === 'tcp');
+
+        if (!httpTunnel || !tcpTunnel) {
+            console.warn("⚠️ Tunnels Ngrok (HTTPS/TCP) introuvables. Vérifie ton fichier ngrok.yml.");
+            return;
+        }
+
+        console.log("✅ Tunnels trouvés :");
+        console.log("   API/WS:", httpTunnel.public_url);
+        console.log("   MQTT:", tcpTunnel.public_url);
+
+        // 3. Préparer le contenu pour GitHub
+        const newConfig = {
+            api_url: httpTunnel.public_url,
+            mqtt_url: tcpTunnel.public_url,
+            updated_at: new Date().toISOString()
+        };
+
+        // 4. Mettre à jour le Gist
+        const gistRes = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `token ${GITHUB_TOKEN}`,
+                'Content-Type': 'application/json',
+                'User-Agent': 'RaspberryPi-IoT-Server'
+            },
+            body: JSON.stringify({
+                files: {
+                    "config.json": {
+                        content: JSON.stringify(newConfig, null, 2)
+                    }
+                }
+            })
+        });
+
+        if (gistRes.ok) {
+            console.log("🚀 GitHub Gist mis à jour avec succès ! Les ESP32 peuvent se connecter.");
+        } else {
+            console.error("❌ Erreur GitHub:", await gistRes.text());
+        }
+
+    } catch (err) {
+        console.error("❌ Erreur lors de la mise à jour du Gist:", err.message);
+        console.log("💡 Vérifie que le conteneur 'ngrok' est bien lancé.");
+    }
+}
+
+// ======================
+// Shutdown
+// ======================
+async function shutdown() {
+    console.log("Shutting down...");
+    try { mqttClient.end(); } catch (e) {}
+    try { wss.close(); } catch (e) {}
+    process.exit(0);
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);

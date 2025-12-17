@@ -19,7 +19,7 @@ COPY server.js ./
 USER node
 
 # Documentation des ports utilisés (HTTP: 3200, WS: 8000 selon ton server.js)
-EXPOSE 3200 8000
+EXPOSE 3200
 
 # Commande de démarrage
 CMD ["node", "server.js"]
