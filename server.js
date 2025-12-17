@@ -481,6 +481,93 @@ app.post("/api/auth/login", async (req, res) => {
     }
 });
 
+
+
+// ======================
+// TEST D'ALERTES
+// ======================
+
+// Envoyer une alerte de test manuelle
+app.post("/api/test/send-alert", apiKeyMiddleware, (req, res) => {
+    const { aideId, patientId, alertType, message } = req.body;
+    
+    if (!aideId) {
+        return res.status(400).json({ error: "aideId requis" });
+    }
+    
+    const payload = {
+        type: "box_alert",
+        patientId: patientId || "test-patient",
+        alertType: alertType || "test",
+        message: message || "Alerte de test",
+        topic: "alert/box/test/manual"
+    };
+    
+    const sent = sendToAide(aideId, payload);
+    res.json({ 
+        success: true, 
+        sent,
+        message: sent ? "Alerte envoyée" : "Aide-soignant hors ligne, alerte en attente"
+    });
+});
+
+// Démarrer l'envoi d'alertes périodiques (pour tests)
+let testAlertInterval = null;
+
+app.post("/api/test/start-periodic-alerts", apiKeyMiddleware, (req, res) => {
+    const { aideId, intervalSeconds } = req.body;
+    
+    if (!aideId) {
+        return res.status(400).json({ error: "aideId requis" });
+    }
+    
+    const interval = (intervalSeconds || 30) * 1000; // Défaut: 30 secondes
+    
+    // Arrêter l'ancien timer s'il existe
+    if (testAlertInterval) {
+        clearInterval(testAlertInterval);
+    }
+    
+    let counter = 1;
+    
+    testAlertInterval = setInterval(() => {
+        const alertTypes = ['empty', 'late', 'low', 'error'];
+        const randomType = alertTypes[Math.floor(Math.random() * alertTypes.length)];
+        
+        const payload = {
+            type: "box_alert",
+            patientId: "pat-test-" + counter,
+            alertType: randomType,
+            message: `Alerte de test #${counter} - ${new Date().toLocaleTimeString('fr-FR')}`,
+            topic: `alert/box/test/${randomType}`
+        };
+        
+        sendToAide(aideId, payload);
+        console.log(`[TEST] Alerte ${counter} envoyée à ${aideId}`);
+        counter++;
+    }, interval);
+    
+    res.json({ 
+        success: true, 
+        message: `Alertes périodiques démarrées pour ${aideId}`,
+        interval: `${intervalSeconds || 30} secondes`
+    });
+});
+
+// Arrêter les alertes périodiques
+app.post("/api/test/stop-periodic-alerts", apiKeyMiddleware, (req, res) => {
+    if (testAlertInterval) {
+        clearInterval(testAlertInterval);
+        testAlertInterval = null;
+        res.json({ success: true, message: "Alertes périodiques arrêtées" });
+    } else {
+        res.json({ success: false, message: "Aucune alerte périodique en cours" });
+    }
+});
+
+
+
+
 // ======================
 // AUTOMATIC GIST UPDATE
 // ======================
@@ -568,5 +655,6 @@ async function shutdown() {
 process.on("SIGINT", shutdown);
 
 process.on("SIGTERM", shutdown);
+
 
 
