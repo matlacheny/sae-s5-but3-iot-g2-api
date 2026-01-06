@@ -36,15 +36,10 @@ jobs:
           NODE_ENV: "test"
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@v4
+        uses: SonarSource/sonarqube-scan-action@v6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        # Si tu n'as pas créé le fichier sonar-project.properties, décommente les lignes ci-dessous :
-        # with:
-        #   args: >
-        #     -Dsonar.organization=TON_ORGANIZATION
-        #     -Dsonar.projectKey=TON_PROJECT_KEY
 
   # --- ÉTAPE 2 : BUILD DOCKER ---
   build:
