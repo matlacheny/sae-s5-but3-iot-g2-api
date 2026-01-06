@@ -4,14 +4,22 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "jest",
+    "test": "jest --detectOpenHandles --coverage",
     "start": "node server.js"
   },
   "jest": {
     "testEnvironment": "node",
     "transform": {
       "^.+\\.js$": "babel-jest"
-    }
+    },
+    "coverageDirectory": "./coverage",
+    "collectCoverageFrom": [
+      "**/*.js",
+      "!**/node_modules/**",
+      "!**/coverage/**",
+      "!**/jest.config.js",
+      "!**/babel.config.cjs"
+    ]
   },
   "keywords": [],
   "author": "",
