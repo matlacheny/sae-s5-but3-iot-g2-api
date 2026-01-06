@@ -105,7 +105,7 @@ async function getAideForPatient(patientId) {
 // ======================
 // Start HTTP server
 // ======================
-const server = app.listen(PORT, () => {
+export const server = app.listen(PORT, () => {
     console.log(`HTTP server running on port ${PORT}`);
     // Lance la mise à jour du Gist après le démarrage
     updateGistWithNgrok();
@@ -118,7 +118,7 @@ const server = app.listen(PORT, () => {
 const wsClients = new Map();
 const pendingAlerts = new Map();
 
-const wss = new WebSocketServer({ server });
+export const wss = new WebSocketServer({ server });
 console.log(`WebSocket server attached to HTTP server on port ${PORT}`);
 
 function wsSendSafe(ws, obj) {
@@ -265,6 +265,8 @@ setInterval(() => {
         console.error("Retry interval error:", err);
     }
 }, RETRY_INTERVAL_MS);
+
+export { app };
 
 // ======================
 // MQTT setup

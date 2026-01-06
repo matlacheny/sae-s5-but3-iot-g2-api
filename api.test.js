@@ -1,5 +1,5 @@
 import request from 'supertest';
-import {afterAll, beforeAll, beforeEach, describe, expect, it, jest} from '@jest/globals';
+import {afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, jest} from '@jest/globals';
 import WebSocket from 'ws';
 
 // 1. Mocker les dépendances AVANT d'importer le serveur
@@ -199,10 +199,18 @@ describe('IoT Server Tests', () => {
     // ============================================
     describe('WebSocket Integration', () => {
         let wsClient;
-        const TEST_PORT = server.address().port;
-        const AIDE_ID = 'aide_ws_1';
-        const AIDE_PWD = 'secure_password';
-
+        let TEST_PORT;
+        const AIDE_ID = 'aso1';
+        const AIDE_PWD = 'pwd123';
+        beforeAll(() => {
+            // Si le serveur écoute déjà, on prend le port
+            if (server.address()) {
+                TEST_PORT = server.address().port;
+            } else {
+                // Sinon (cas rare en test), on met le port par défaut
+                TEST_PORT = process.env.PORT || 3200;
+            }
+        });
         afterEach(() => {
             if (wsClient && wsClient.readyState === WebSocket.OPEN) {
                 wsClient.close();
