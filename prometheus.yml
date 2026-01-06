@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 5s # Scrape toutes les 5 secondes pour avoir des données temps réel
+
+scrape_configs:
+  - job_name: 'sae-node-api'
+    static_configs:
+      # 'app' est le nom du service défini dans ton docker-compose
+      # Docker résout automatiquement ce nom vers l'IP interne du conteneur
+      - targets: ['app:3200']

@@ -1,5 +1,6 @@
 // server.js
 import express from "express";
+import client from "prom-client";
 import dotenv from "dotenv";
 import helmet from "helmet";
 import cors from "cors";
@@ -35,12 +36,42 @@ const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "";
 const NGROK_API_URL = "http://ngrok:4040/api/tunnels";
 
 // ======================
+// PROMETHEUS SETUP
+// ======================
+// Collecte les métriques par défaut (CPU, RAM, Event Loop)
+const collectDefaultMetrics = client.collectDefaultMetrics;
+collectDefaultMetrics();
+
+// (Optionnel) Histogramme pour mesurer la durée des requêtes HTTP
+const httpRequestDurationMicroseconds = new client.Histogram({
+    name: 'http_request_duration_seconds',
+    help: 'Duration of HTTP requests in seconds',
+    labelNames: ['method', 'route', 'code'],
+    buckets: [0.1, 0.5, 1, 1.5]
+});
+
+// ======================
 // Express + middleware
 // ======================
 const app = express();
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
+
+app.use((req, res, next) => {
+    const end = httpRequestDurationMicroseconds.startTimer();
+    res.on('finish', () => {
+        // On évite d'enregistrer les appels vers /metrics pour ne pas polluer
+        if (req.path === '/metrics') return;
+
+        end({
+            method: req.method,
+            route: req.route ? req.route.path : req.path,
+            code: res.statusCode
+        });
+    });
+    next();
+});
 
 // simple API key middleware for protected REST endpoints
 function apiKeyMiddleware(req, res, next) {
@@ -326,9 +357,25 @@ mqttClient.on("message", async (topic, messageBuf) => {
     }
 });
 
+
+// ======================
+// PROMETHEUS ENDPOINT
+// ======================
+app.get('/metrics', async (req, res) => {
+    try {
+        res.set('Content-Type', client.register.contentType);
+        res.end(await client.register.metrics());
+    } catch (ex) {
+        res.status(500).end(ex);
+    }
+});
+
 // ======================
 // REST endpoints
 // ======================
+
+
+
 app.get("/api/health", (req, res) => {
     res.json({
         status: "ok",
