@@ -23,10 +23,7 @@ jobs:
 
       - name: Run Tests
         # On lance le serveur en arrière-plan (&), on attend 5s qu'il démarre, puis on teste
-        run: |
-          npm start &
-          sleep 5
-          npm test
+        run: npm test
         env:
           # Variables d'environnement "Bouchon" (Mock) pour que le serveur démarre sans erreur
           PORT: 3200
