@@ -27,8 +27,15 @@ jobs:
         run: |
           npm install
           npm run build --if-present
-          npm run test --if-present
-
+          npm run test
+        env:
+          # On fournit une clé API bidon pour que les tests puissent démarrer
+          # (même si api.test.js l'écrase, c'est une sécurité pour l'initialisation)
+          API_KEY: test-secret-key
+          DB_USER: fake
+          DB_PASSWORD: fake
+          DB_SERVER: fake
+          DB_NAME: fake
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
