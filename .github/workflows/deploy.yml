@@ -31,7 +31,7 @@ jobs:
           API_KEY: ${{ secrets.API_KEY }}
           MQTT_URL: "mqtt://localhost"
           GIST_ID: ${{ secrets.GIST_ID }}
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           API_BASE_URL: ${{ secrets.API_BASE_URL }}
           NODE_ENV: "test"
 
