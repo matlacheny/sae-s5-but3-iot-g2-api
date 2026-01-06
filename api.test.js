@@ -50,6 +50,7 @@ describe('IoT Server Tests', () => {
     });
 
     afterAll((done) => {
+        stopRetryTimer();
         // On force la fermeture de tout pour que Jest s'arrête
         wss.close(() => {
             server.close(done);
