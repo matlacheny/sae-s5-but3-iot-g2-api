@@ -105,6 +105,11 @@ async function getAideForPatient(patientId) {
 // ======================
 // Start HTTP server
 // ======================
+
+export function stopRetryTimer() {
+    if (retryTimer) clearInterval(retryTimer);
+}
+
 export const server = app.listen(PORT, () => {
     console.log(`HTTP server running on port ${PORT}`);
     // Lance la mise à jour du Gist après le démarrage
@@ -252,7 +257,7 @@ function sendToAide(aideId, data) {
     return true;
 }
 
-setInterval(() => {
+const retryTimer = setInterval(() => {
     try {
         wsClients.forEach((clientSet, aideId) => {
             const queue = pendingAlerts.get(aideId);

@@ -29,7 +29,7 @@ jest.mock('mqtt', () => ({
 // ==========================================
 // 3. IMPORT DU SERVEUR
 // ==========================================
-import { app, server, wss } from './server.js';
+import { app, server, wss, stopRetryTimer } from './server.js';
 
 const API_KEY = process.env.API_KEY;
 
