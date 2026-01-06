@@ -9,6 +9,7 @@ process.env.API_KEY = process.env.API_KEY || "supercleAPI";
 process.env.PORT = "0";
 process.env.RETRY_INTERVAL_MS = "1000";
 process.env.NODE_ENV = 'test';
+
 // 👇 AJOUT CRUCIAL : Pour éviter l'erreur 500 dans /api/prescriptions
 process.env.API_BASE_URL = process.env.API_BASE_URL |"https://api.fake-database.com";
 
