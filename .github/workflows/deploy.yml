@@ -32,7 +32,7 @@ jobs:
           MQTT_URL: "mqtt://localhost"
           # On met des fausses valeurs pour Gist/GitHub pour ne pas déclencher la vraie mise à jour
           GIST_ID: ${{ secrets.GIST_ID }}
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           API_BASE_URL: ${{ secrets.API_BASE_URL }}
           # Désactive les logs trop verbeux pendant les tests si tu veux
           NODE_ENV: "test"
