@@ -5,7 +5,43 @@ on:
     branches: [ "main-server" ]
 
 jobs:
+  # --- ÉTAPE 1 : LES TESTS ---
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Tests
+        # On lance le serveur en arrière-plan (&), on attend 5s qu'il démarre, puis on teste
+        run: |
+          npm start &
+          sleep 5
+          npm test
+        env:
+          # Variables d'environnement "Bouchon" (Mock) pour que le serveur démarre sans erreur
+          PORT: 3200
+          API_KEY: ${{ secrets.API_KEY }}
+          # On met localhost pour éviter que le serveur cherche le vrai Mosquitto
+          MQTT_URL: "mqtt://localhost"
+          # On met des fausses valeurs pour Gist/GitHub pour ne pas déclencher la vraie mise à jour
+          GIST_ID: "test_gist_id"
+          GITHUB_TOKEN: "test_github_token"
+          # Désactive les logs trop verbeux pendant les tests si tu veux
+          NODE_ENV: "test"
+
+  # --- ÉTAPE 2 : BUILD DOCKER (Seulement si les tests passent) ---
   build:
+    needs: test  # 👈 C'est cette ligne qui bloque le build si les tests échouent
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -28,6 +64,6 @@ jobs:
         with:
           context: .
           push: true
-          # Important : on cible l'architecture du Raspberry Pi (souvent arm64 pour les Pi 3/4/5)
+          # Important : on cible l'architecture du Raspberry Pi
           platforms: linux/amd64,linux/arm64
           tags: matlacheny/saeiotserver:latest
