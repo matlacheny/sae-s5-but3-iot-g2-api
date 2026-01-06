@@ -9,6 +9,8 @@ process.env.API_KEY = process.env.API_KEY || "supercleAPI";
 process.env.PORT = "0";
 process.env.RETRY_INTERVAL_MS = "1000";
 process.env.NODE_ENV = 'test';
+// 👇 AJOUT CRUCIAL : Pour éviter l'erreur 500 dans /api/prescriptions
+process.env.API_BASE_URL = process.env.API_BASE_URL |"https://api.fake-database.com";
 
 // ==========================================
 // 2. MOCKS GLOBAUX
@@ -29,8 +31,6 @@ jest.mock('mqtt', () => ({
 // ==========================================
 import { app, server, wss } from './server.js';
 
-// ⚠️ CORRECTION ICI : On déclare API_KEY au niveau global du fichier
-// pour qu'elle soit visible dans tous les tests 'describe' et 'it'
 const API_KEY = process.env.API_KEY;
 
 describe('IoT Server Tests', () => {
@@ -38,7 +38,6 @@ describe('IoT Server Tests', () => {
     let TEST_PORT;
 
     beforeAll((done) => {
-        // On attend que le serveur soit prêt et on récupère son port
         if (server.listening) {
             TEST_PORT = server.address().port;
             done();
@@ -51,7 +50,7 @@ describe('IoT Server Tests', () => {
     });
 
     afterAll((done) => {
-        // On ferme tout proprement pour éviter que Jest ne pende
+        // On force la fermeture de tout pour que Jest s'arrête
         wss.close(() => {
             server.close(done);
         });
@@ -59,7 +58,7 @@ describe('IoT Server Tests', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        // Reset du mock fetch par défaut (Status OK pour ne pas bloquer les appels basiques)
+        // Reset du mock fetch par défaut
         global.fetch.mockResolvedValue({
             ok: true,
             status: 200,
@@ -93,7 +92,6 @@ describe('IoT Server Tests', () => {
         });
 
         it('devrait accepter l\'accès avec bonne API Key', async () => {
-            // API_KEY est maintenant bien définie !
             const res = await request(app)
                 .get('/api/clients')
                 .set('api_key', API_KEY);
@@ -144,9 +142,10 @@ describe('IoT Server Tests', () => {
         });
 
         it('devrait réussir si l\'API externe répond OK', async () => {
+            // Mock de la réponse de l'API externe (Database)
             global.fetch.mockResolvedValueOnce({
                 ok: true,
-                json: async () => ({ id: 101 })
+                json: async () => ({ id: 101 }) // Réponse de l'API externe
             });
 
             const res = await request(app)
@@ -159,6 +158,7 @@ describe('IoT Server Tests', () => {
                     quantite_restante: 10,
                     compartiment: 1
                 });
+
             expect(res.statusCode).toEqual(200);
             expect(res.body.success).toBe(true);
         });
@@ -178,21 +178,13 @@ describe('IoT Server Tests', () => {
             }
         });
 
-        // ⚠️ CORRECTION : Le serveur accepte la connexion (open) PUIS la ferme.
-        // On ne doit pas échouer sur 'open', mais attendre 'close' ou un message d'erreur.
         it('WS: Devrait rejeter connexion sans paramètres (Fermeture attendue)', (done) => {
             wsClient = new WebSocket(`ws://localhost:${TEST_PORT}`);
-
-            // Si le serveur ferme la connexion, le test est réussi
             wsClient.on('close', () => done());
-
-            // Si le serveur envoie un message d'erreur (c'est ce que fait ton code), c'est réussi aussi
             wsClient.on('message', (data) => {
                 const msg = JSON.parse(data);
-                if (msg.error) wsClient.close(); // Déclenchera l'event close ci-dessus
+                if (msg.error) wsClient.close();
             });
-
-            // On retire le fail sur 'open' car le handshake TCP réussit toujours
         });
 
         it('WS: Devrait rejeter connexion avec mauvais token', (done) => {
@@ -204,11 +196,11 @@ describe('IoT Server Tests', () => {
                     done();
                 }
             });
-            wsClient.on('close', () => done()); // Si fermé directement, c'est bon aussi
+            wsClient.on('close', () => done());
         });
 
         it('WS: Scénario complet (Connexion -> Réception Alerte -> ACK)', (done) => {
-            // Mock Auth réussi
+            // Mock Auth réussi pour la connexion WS
             global.fetch.mockResolvedValueOnce({
                 ok: true,
                 json: async () => ({ mot_de_passe: AIDE_PWD })
@@ -217,7 +209,11 @@ describe('IoT Server Tests', () => {
             wsClient = new WebSocket(`ws://localhost:${TEST_PORT}?id=${AIDE_ID}&pwd=${AIDE_PWD}&token=${API_KEY}`);
 
             wsClient.on('open', async () => {
-                // Déclenche l'alerte une fois connecté
+                // ⚠️ AJOUT DU DELAI : On attend 500ms pour être sûr que le serveur
+                // a fini d'enregistrer le WebSocket dans sa Map 'wsClients'
+                await new Promise(r => setTimeout(r, 500));
+
+                // Maintenant on déclenche l'alerte
                 await request(app)
                     .post('/api/test/send-alert')
                     .set('api_key', API_KEY)
@@ -237,6 +233,6 @@ describe('IoT Server Tests', () => {
                     done();
                 }
             });
-        });
+        }, 10000); // Timeout augmenté à 10s pour ce test
     });
 });

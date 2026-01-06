@@ -108,7 +108,9 @@ async function getAideForPatient(patientId) {
 export const server = app.listen(PORT, () => {
     console.log(`HTTP server running on port ${PORT}`);
     // Lance la mise à jour du Gist après le démarrage
-    updateGistWithNgrok();
+    if (process.env.NODE_ENV !== 'test') {
+        updateGistWithNgrok();
+    }
 });
 
 // ======================
