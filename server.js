@@ -342,6 +342,17 @@ mqttClient.on("message", async (topic, messageBuf) => {
   const message = messageBuf.toString();
   console.log(`[MQTT] ${topic} -> ${message}`);
 
+  // Pour la partie MECANIQUE
+  try {
+    const data = JSON.parse(message);
+
+    if (data.status === "MECANIQUE") {
+      console.log("ALLERTE MECANIQUE");
+    }
+  } catch (e) {
+    console.log("Erreur : ", e);
+  }
+
   const parts = topic.split("/").filter(Boolean);
   if (parts.length >= 4 && parts[0] === "alert" && parts[1] === "box") {
     const patientId = parts[2];
