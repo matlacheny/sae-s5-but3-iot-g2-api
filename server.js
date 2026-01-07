@@ -189,7 +189,14 @@ wss.on("connection", async (ws, req) => {
   }
 
   if (API_KEY && token !== API_KEY) {
-    wsSendSafe(ws, { error: "Invalid token" });
+    wsSendSafe(ws, {
+      error: "Invalid token",
+      debug: {
+        token_recu: token,
+        api_key_attendue: API_KEY,
+      },
+    });
+    //wsSendSafe(ws, { error: "Invalid token" });
     ws.close();
     return;
   }
@@ -1409,4 +1416,5 @@ async function shutdown() {
 process.on("SIGINT", shutdown);
 
 process.on("SIGTERM", shutdown);
+
 
