@@ -602,6 +602,200 @@ app.post("/api/auth/login", async (req, res) => {
 });
 
 // ======================
+// ENDPOINT D'INSCRIPTION
+// ======================
+
+// Fonction pour générer un ID unique
+function generateUniqueId(role) {
+  const prefix = role === 'aidesoignants' ? 'aso' : role === 'medecins' ? 'med' : 'pat';
+  const timestamp = Date.now().toString().slice(-6);
+  const random = Math.floor(Math.random() * 1000);
+  return `${prefix}${timestamp}${random}`;
+}
+
+// Inscription aide-soignant
+app.post("/api/auth/signup/aidesoignant", async (req, res) => {
+  const { nomFamille, prenom, date_naissance, sexe, adresse_postale, adresse_electronique, mot_de_passe } = req.body;
+
+  // Validation des champs requis
+  if (!nomFamille || !prenom || !mot_de_passe) {
+    return res.status(400).json({
+      error: "Champs obligatoires manquants",
+      required: ["nomFamille", "prenom", "mot_de_passe"]
+    });
+  }
+
+  try {
+    // Générer un ID unique
+    const id_aide_soignant = generateUniqueId('aidesoignants');
+
+    const response = await fetch(`${API_BASE}/aidesoignants`, {
+      method: "POST",
+      headers: {
+        api_key: API_KEY,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        id_aide_soignant,
+        mot_de_passe,
+        nomFamille,
+        prenom,
+        sexe: sexe || "U",
+        date_naissance: date_naissance || null,
+        adresse_postale: adresse_postale || null,
+        adresse_electronique: adresse_electronique || null
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({
+        error: "Erreur création compte",
+        details: errorText
+      });
+    }
+
+    const data = await response.json();
+    console.log(`[SIGNUP] ✅ Aide-soignant créé: ${id_aide_soignant}`);
+
+    res.status(201).json({
+      success: true,
+      user: data,
+      id: id_aide_soignant,
+      message: "Compte aide-soignant créé avec succès"
+    });
+  } catch (error) {
+    console.error(`[SIGNUP] Erreur:`, error);
+    res.status(500).json({
+      error: "Erreur serveur",
+      message: error.message
+    });
+  }
+});
+
+// Inscription médecin
+app.post("/api/auth/signup/medecin", async (req, res) => {
+  const { nomFamille, prenom, date_naissance, sexe, adresse_postale, adresse_electronique, mot_de_passe } = req.body;
+
+  if (!nomFamille || !prenom || !mot_de_passe) {
+    return res.status(400).json({
+      error: "Champs obligatoires manquants",
+      required: ["nomFamille", "prenom", "mot_de_passe"]
+    });
+  }
+
+  try {
+    const id_medecin = generateUniqueId('medecins');
+
+    const response = await fetch(`${API_BASE}/medecins`, {
+      method: "POST",
+      headers: {
+        api_key: API_KEY,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        id_medecin,
+        mot_de_passe,
+        nomFamille,
+        prenom,
+        sexe: sexe || "U",
+        date_naissance: date_naissance || null,
+        adresse_postale: adresse_postale || null,
+        adresse_electronique: adresse_electronique || null
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({
+        error: "Erreur création compte",
+        details: errorText
+      });
+    }
+
+    const data = await response.json();
+    console.log(`[SIGNUP] ✅ Médecin créé: ${id_medecin}`);
+
+    res.status(201).json({
+      success: true,
+      user: data,
+      id: id_medecin,
+      message: "Compte médecin créé avec succès"
+    });
+  } catch (error) {
+    console.error(`[SIGNUP] Erreur:`, error);
+    res.status(500).json({
+      error: "Erreur serveur",
+      message: error.message
+    });
+  }
+});
+
+// Création de patient par aide-soignant
+app.post("/api/patients/create", apiKeyMiddleware, async (req, res) => {
+  const { nomFamille, prenom, date_naissance, sexe, adresse_postale, adresse_electronique, fk_aide_soignant } = req.body;
+
+  if (!nomFamille || !prenom || !fk_aide_soignant) {
+    return res.status(400).json({
+      error: "Champs obligatoires manquants",
+      required: ["nomFamille", "prenom", "fk_aide_soignant"]
+    });
+  }
+
+  try {
+    const id_patient = generateUniqueId('patients');
+    const mot_de_passe_patient = `patient${Math.floor(Math.random() * 10000)}`;
+
+    const response = await fetch(`${API_BASE}/patients`, {
+      method: "POST",
+      headers: {
+        api_key: API_KEY,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        id_patient,
+        mot_de_passe: mot_de_passe_patient,
+        nomFamille,
+        prenom,
+        sexe: sexe || "U",
+        date_naissance: date_naissance || null,
+        adresse_postale: adresse_postale || null,
+        adresse_electronique: adresse_electronique || null,
+        fk_aide_soignant,
+        fk_medecin_traitant: null
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({
+        error: "Erreur création patient",
+        details: errorText
+      });
+    }
+
+    const data = await response.json();
+    console.log(`[PATIENT] ✅ Patient créé: ${id_patient}`);
+
+    res.status(201).json({
+      success: true,
+      patient: data,
+      id: id_patient,
+      tempPassword: mot_de_passe_patient,
+      message: "Patient créé avec succès"
+    });
+  } catch (error) {
+    console.error(`[PATIENT] Erreur:`, error);
+    res.status(500).json({
+      error: "Erreur serveur",
+      message: error.message
+    });
+  }
+});
+
+
+
+// ======================
 // TEST D'ALERTES
 // ======================
 
@@ -1111,3 +1305,4 @@ async function shutdown() {
 process.on("SIGINT", shutdown);
 
 process.on("SIGTERM", shutdown);
+
