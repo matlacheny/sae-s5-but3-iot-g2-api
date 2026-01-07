@@ -818,6 +818,87 @@ app.post("/api/patients/create", apiKeyMiddleware, async (req, res) => {
   }
 });
 
+// ==================================
+// ENDPOINT DE SUPPRESSION DE PATIENT
+// ==================================
+
+// Supprimer un patient via le compte aide soignant 
+app.delete("/api/patients/:patientId", apiKeyMiddleware, async (req, res) => {
+  const patientId = req.params.patientId;
+
+  if (!patientId) {
+    return res.status(400).json({
+      error: "ID patient requis"
+    });
+  }
+
+  if (!API_BASE) {
+    return res.status(500).json({ error: "API_BASE_URL non configurée" });
+  }
+
+  try {
+    console.log(`[DELETE] Tentative de suppression du patient: ${patientId}`);
+
+    // Vérifier d'abord que le patient existe
+    const checkUrl = `${API_BASE}/patients/${encodeURIComponent(patientId)}`;
+    const checkResponse = await fetch(checkUrl, {
+      method: "GET",
+      headers: {
+        api_key: API_KEY,
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (!checkResponse.ok) {
+      if (checkResponse.status === 404) {
+        return res.status(404).json({
+          error: "Patient non trouvé",
+          patientId
+        });
+      }
+      return res.status(checkResponse.status).json({
+        error: "Erreur lors de la vérification du patient"
+      });
+    }
+
+    // Supprimer le patient
+    const deleteUrl = `${API_BASE}/patients/${encodeURIComponent(patientId)}`;
+    const deleteResponse = await fetch(deleteUrl, {
+      method: "DELETE",
+      headers: {
+        api_key: API_KEY,
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (!deleteResponse.ok) {
+      const errorText = await deleteResponse.text();
+      console.error(`[DELETE] Erreur API: ${errorText}`);
+      return res.status(deleteResponse.status).json({
+        error: "Erreur lors de la suppression",
+        details: errorText
+      });
+    }
+
+    console.log(`[DELETE] ✅ Patient supprimé: ${patientId}`);
+
+    res.json({
+      success: true,
+      message: "Patient supprimé avec succès",
+      patientId
+    });
+  } catch (err) {
+    console.error("[DELETE] Erreur:", err);
+    res.status(500).json({ 
+      error: "Erreur serveur lors de la suppression",
+      message: err.message 
+    });
+  }
+});
+
+
+
+
 // ======================
 // TEST D'ALERTES
 // ======================
@@ -1328,3 +1409,4 @@ async function shutdown() {
 process.on("SIGINT", shutdown);
 
 process.on("SIGTERM", shutdown);
+
