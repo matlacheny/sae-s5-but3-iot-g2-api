@@ -158,6 +158,7 @@ export const server = app.listen(PORT, () => {
 
 const wsClients = new Map();
 const pendingAlerts = new Map();
+const listePannes = [];
 
 export const wss = new WebSocketServer({ server });
 console.log(`WebSocket server attached to HTTP server on port ${PORT}`);
@@ -345,9 +346,40 @@ mqttClient.on("message", async (topic, messageBuf) => {
   // Pour la partie MECANIQUE
   try {
     const data = JSON.parse(message);
+    const aideId = await getAideForPatient(data.id_patient);
 
-    if (data.status === "MECANIQUE") {
-      console.log("ALLERTE MECANIQUE");
+    if (data.status === "TECHNIQUE" || data.status === "MECANIQUE") {
+      console.log("\n/!\\ ALERTE MAINTENANCE /!\\");
+      console.log(`📦 Box (Patient) : ${data.id_patient}`);
+      console.log(`🔧 Problème      : ${data.message}`);
+      console.log(`👤 Responsable   : ${aideId ? aideId : "Aucun"}`);
+      console.log("--------------------------------------------------\n");
+      listePannes.unshift({
+        date: new Date().toLocaleString(),
+        box: data.id_patient,
+        probleme: data.message,
+        responsable: aideId || "Non assigné",
+        resolu: false,
+      });
+      if (listePannes.length > 70) listePannes.pop();
+    } else {
+      if (aideId) {
+        console.log(
+          `📨 Envoi info à l'aide-soignant ${aideId} : ${data.status}`
+        );
+        sendToAide(aideId, {
+          type: "box_alert",
+          patientId: data.id_patient,
+          alertType: data.status,
+          message: data.message,
+          timestamp: new Date().toISOString(),
+          severity: data.status === "ALERTE" ? "high" : "info",
+        });
+      } else {
+        console.log(
+          `⚠️ Info reçue (${data.status}) mais aucun aide-soignant assigné.`
+        );
+      }
     }
   } catch (e) {
     console.log("Erreur : ", e);
