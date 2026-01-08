@@ -359,8 +359,8 @@ mqttClient.on("message", async (topic, messageBuf) => {
 
     if (alertType === "mecanic") {
       console.log("\n/!\\ ALERTE MAINTENANCE /!\\");
-      console.log(`📦 Box (Patient) : ${data.id_patient}`);
-      console.log(`🔧 Problème      : ${data.message}`);
+      console.log(`📦 Box (Patient) : ${patientId}`);
+      console.log(`🔧 Problème      : ${message}`);
       console.log(`👤 Responsable   : ${aideId ? aideId : "Aucun"}`);
       console.log("--------------------------------------------------\n");
     }else if (alertType === "seuilmedoc") {
@@ -1516,6 +1516,7 @@ async function shutdown() {
 process.on("SIGINT", shutdown);
 
 process.on("SIGTERM", shutdown);
+
 
 
 
