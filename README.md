@@ -1,131 +1,108 @@
-# sae-s5-but3-iot-g2-api
-# SAE S5 — BUT3 — API Backend (Node.js + Azure SQL)
+Here is the **README.md** file for the Azure API repository, written in a neutral style with no emojis.
 
-Cette API a été développée dans le cadre de la SAE S5 BUT3 IOT - Groupe 2.  
-Elle sert d’interface sécurisée entre une base de données **Azure SQL Database** et une application web/mobile (ex : React).
+---
 
-L’objectif est de fournir des **endpoints REST** permettant de lire et manipuler les données de la base, tout en assurant :
+# Azure Node.js API
 
-- Sécurité (Helmet, CORS, Azure App Service)
-- Connexion fiable à Azure SQL (pool global MSSQL)
-- Support pour déploiement cloud (Azure App Service)
-- Architecture simple et extensible
+This repository contains the source code for the Cloud API used in the IoT architecture. It is built with Node.js and Express, designed to be deployed on Azure App Service. It handles data persistence using Azure SQL Database and provides REST endpoints for the IoT Gateway and frontend applications.
 
-## Fonctionnalités principales
+## Project Overview
 
-- API REST en Node.js / Express
-- Connexion sécurisée à Azure SQL Database
-- Gestion d’un pool de connexions pour optimiser les performances
-- Sécurisation via :
-    - helmet
-    - cors
-    - variables d’environnement uniquement
-- Routes simples et propres
-- Endpoint de santé (`/health`) pour les probes Azure
+* **Runtime**: Node.js (v20 LTS recommended)
+* **Database**: Azure SQL (MSSQL)
+* **Deployment**: Azure App Service (Linux)
+* **CI/CD**: GitHub Actions
 
-## Installation & Développement local
+## Prerequisites
 
-### 1. Cloner le projet
+Before deploying, ensure you have the following:
+
+* **Azure Subscription**: To create App Services and SQL Databases.
+* **GitHub Account**: To host the repository and run GitHub Actions.
+* **Node.js & npm**: For local development and testing.
+
+## Local Installation
+
+1. **Clone the repository:**
 ```bash
-git clone https://github.com/…/sae-s5-but3-iot-g2-api.git
-cd sae-s5-but3-iot-g2-api
+git clone https://github.com/your-username/sae-iot-api.git
+cd sae-iot-api
+
 ```
-2. Installer les dépendances
+
+
+2. **Install dependencies:**
 ```bash
 npm install
-```
-3. Configurer l'environnement
 
-Créer un fichier .env :
 ```
-DB_USER=xxxx
-DB_PASSWORD=xxxx
-DB_SERVER=xxxx.database.windows.net
-DB_NAME=xxxx
-```
-Important : Ne jamais mettre ces informations dans le dépôt.
-En production, elles doivent être configurées dans Azure App Service → Configuration.
-4. Lancer l’API en local
+
+
+3. **Run locally:**
+   To run the server locally, you must configure a `.env` file with valid database credentials.
 ```bash
 npm start
+
 ```
-L’API sera accessible sur :
-http://localhost:3000/
-Architecture du projet
+
+
+4. **Run tests:**
+```bash
+npm test
+
 ```
-sae-s5-but3-iot-g2-api
-│
-├── index.js           # Point d'entrée de l'API
-├── package.json       # Dépendances + scripts
-├── .env (local only)  # Variables d'environnement
-└── ...
-```
-Connexion à Azure SQL
 
-La connexion utilise un pool global :
 
-const pool = await sql.connect(dbConfig);
 
-Cette approche :
+## Configuration
 
-    évite de recréer une connexion à chaque requête
+The application relies on environment variables to connect to the database and secure endpoints. These must be configured in the Azure App Service settings.
 
-    améliore les performances
+### Required Environment Variables
 
-    est recommandée par Microsoft
+| Variable Name | Description | Example Value |
+| --- | --- | --- |
+| `DB_SERVER` | The hostname of the Azure SQL Server. | `sae-sql-server.database.windows.net` |
+| `DB_NAME` | The name of the specific database. | `sae-db` |
+| `DB_USER` | The admin username for SQL authentication. | `dbadmin` |
+| `DB_PWD` | The password for the SQL user. | `SecurePassword123!` |
+| `API_KEY` | A secret key to secure restricted endpoints. | `your_generated_api_key` |
+| `PORT` | The port the server listens on (Azure sets this automatically). | `8080` |
 
-Routes disponibles
-/health
+## Deployment Guide
 
-Vérifie que l’API est opérationnelle.
-Usage : probes de démarrage et monitoring Azure.
-/api/test
+### 1. Database Setup (Azure Portal)
 
-Exemple de route qui interroge la base de données :
-```
-SELECT * FROM TestItems;
-```
-Ajouter vos propres routes
+1. Create a new **SQL Database** resource in Azure.
+2. Configure the **SQL Server** with SQL Authentication (User/Password).
+3. In the "Networking" settings of the SQL Server, enable the option **"Allow Azure services and resources to access this server"**. This allows the App Service to connect to the database.
 
-Un espace est prévu dans le code pour ajouter les routes :
-```
-// --- PLACEHOLDER FOR OTHER ROUTES ---
+### 2. App Service Setup
 
-app.get("/api/... ", async (req, res) => {
-    ...
-});
-```
-Ici, vous pouvez documenter vos futures routes (GET, POST, PUT, DELETE).
-Déploiement sur Azure App Service
+1. Create a new **Web App** in Azure.
+2. Select **Publish: Code**, **Runtime: Node 20 LTS**, and **OS: Linux**.
+3. Navigate to **Settings > Environment variables** in the App Service menu.
+4. Add all the variables listed in the "Configuration" section above.
 
-    Pousser le code sur GitHub
+### 3. CI/CD Pipeline (GitHub Actions)
 
-    Créer un Azure App Service – Node.js
+This repository includes a GitHub Actions workflow file `.github/workflows/main_apidatabasesae.yml` configured to deploy automatically to Azure.
 
-    Configurer les variables d’environnement dans Configuration → Application settings
+To enable it:
 
-    Déployer via GitHub Actions ou Zip Deploy
+1. Download the **Publish Profile** from your Azure App Service "Overview" page.
+2. Go to your GitHub repository **Settings > Secrets and variables > Actions**.
+3. Create a new repository secret named `AZUREAPPSERVICE_PUBLISHPROFILE`.
+4. Paste the content of the Publish Profile file as the value.
+5. Ensure the `app-name` in `.github/workflows/main_apidatabasesae.yml` matches your Azure App Service name.
 
-    Vérifier /health pour confirmer le bon fonctionnement
+Any push to the `main` branch will now trigger a build and deployment.
 
-Technologies utilisées
+## API Endpoints
 
-    Node.js
+The API exposes the following primary resources (subject to `API_KEY` verification in headers):
 
-    Express
-
-    mssql (pilotage Azure SQL)
-
-    dotenv
-
-    helmet
-
-    cors
-
-    Azure App Service
-
-    Azure SQL Database
-
-Licence
-
-Projet académique — utilisation interne dans le cadre du BUT Informatique.
+* **GET /api/health**: Returns the status of the API and database connection.
+* **GET /api/patients**: Retrieves list of patients.
+* **POST /api/prescriptions**: Adds a new prescription record.
+* **POST /api/auth/login**: Authenticates users based on role (medecins, aidesoignants, patients).
