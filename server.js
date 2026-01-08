@@ -431,9 +431,9 @@ mqttClient.on("message", async (topic, messageBuf) => {
           });
       
           if (!response.ok) {
-            console.error("error : ", await r.text());
+            console.error("error : ", await response.text());
           }
-          const data = await r.json();
+          const data = await response.json();
           console.log("succes");
         } catch (err) {
           console.error("Error posting prescription:", err);
@@ -458,9 +458,9 @@ mqttClient.on("message", async (topic, messageBuf) => {
           const url = `${API_BASE}/prescriptions/${encodeURIComponent(patientId)}`;
           const response = await fetch(url);
           if (!response.ok) {
-            console.error("error : ", await r.text());
+            console.error("error : ", await response.text());
           }
-          const data = await r.json();
+          const data = await response.json();
           console.log("data : ", data);
         } catch (err) {
           console.error("Error fetching prescriptions:", err);
@@ -1511,6 +1511,7 @@ async function shutdown() {
 process.on("SIGINT", shutdown);
 
 process.on("SIGTERM", shutdown);
+
 
 
 
