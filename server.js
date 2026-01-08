@@ -437,7 +437,6 @@ mqttClient.on("message", async (topic, messageBuf) => {
           console.log("succes");
         } catch (err) {
           console.error("Error posting prescription:", err);
-         console.error("error : ", err.message });
         }
         //sendToAide(aideId, payload);
       } else {
@@ -1512,6 +1511,7 @@ async function shutdown() {
 process.on("SIGINT", shutdown);
 
 process.on("SIGTERM", shutdown);
+
 
 
 
