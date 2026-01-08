@@ -506,7 +506,6 @@ mqttClient.on("message", async (topic, messageBuf) => {
         console.log(`No aide-soignant found for patient ${patientId}`);
       }
     }else if (alertType === "createclient") {
-      const data = JSON.parse(message);
       
       const payload = {
         type: "request",
@@ -515,16 +514,6 @@ mqttClient.on("message", async (topic, messageBuf) => {
         message,
         topic,
       };
-      
-      const mot_de_passe = data.mot_de_passe;
-      const nomFamille = data.nomFamille;
-      const prenom = data.prenom;
-      const sexe = data.sexe;
-      const date_naissance = data.date_naissance;
-      const adresse_postale = data.adresse_postale;
-      const adresse_electronique = data.adresse_electronique;
-      const fk_aide_soignant = data.fk_aide_soignant;
-      const fk_medecin_traitant = data.fk_medecin_traitant;
 
       if (aideId) {
         try {
@@ -537,11 +526,11 @@ mqttClient.on("message", async (topic, messageBuf) => {
             },
             body: JSON.stringify({
               id_patient,
-              mot_de_passe: mot_de_passe || "1234",
-              nomFamille: nomFamille || "default",
-              prenom: prenom || id_patient,
-              sexe: sexe || "U",
-              date_naissance: date_naissance || null,
+              mot_de_passe: "1234",
+              nomFamille: "default",
+              prenom: id_patient,
+              sexe: "U",
+              date_naissance: null,
               adresse_postale: null,
               adresse_electronique: null,
               fk_aide_soignant: null,
@@ -1567,6 +1556,7 @@ async function shutdown() {
 process.on("SIGINT", shutdown);
 
 process.on("SIGTERM", shutdown);
+
 
 
 
