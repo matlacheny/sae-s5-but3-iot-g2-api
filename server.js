@@ -409,16 +409,16 @@ mqttClient.on("message", async (topic, messageBuf) => {
       const compartiment = data.compartiment;
     
       if (!nom_medoc || !quantite_totale || !quantite_restante || !compartiment) {
-        return res.status(400).json({ error: "Champs obligatoires manquants" });
+        console.error("il manque des champs");
       }
 
       if (aideId) {
         try {
           if (!API_BASE) {
-            return res.status(500).json({ error: "API_BASE_URL non configurée" });
+            console.error("API_BASE_URL non configurée");
           }
           const url = `${API_BASE}/prescriptions/${encodeURIComponent(patientId)}`;
-          const r = await fetch(url, {
+          const response = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -430,14 +430,14 @@ mqttClient.on("message", async (topic, messageBuf) => {
             }),
           });
       
-          if (!r.ok) {
-            return res.status(r.status).json({ error: await r.text() });
+          if (!response.ok) {
+            console.error("error : ", await r.text());
           }
           const data = await r.json();
-          res.json({ success: true, data });
+          console.log("succes");
         } catch (err) {
           console.error("Error posting prescription:", err);
-          res.status(500).json({ error: err.message });
+         console.error("error : ", err.message });
         }
         //sendToAide(aideId, payload);
       } else {
@@ -454,18 +454,17 @@ mqttClient.on("message", async (topic, messageBuf) => {
 
       if (aideId) {
         if (!API_BASE)
-          return res.status(500).json({ error: "API_BASE_URL not configured" });
+          console.error("error: API_BASE_URL not configured");
         try {
           const url = `${API_BASE}/prescriptions/${encodeURIComponent(patientId)}`;
-          const r = await fetch(url);
-          if (!r.ok) {
-            return res.status(r.status).json({ error: await r.text() });
+          const response = await fetch(url);
+          if (!response.ok) {
+            console.error("error : ", await r.text());
           }
           const data = await r.json();
-          res.json(data);
+          console.log("data : ", data);
         } catch (err) {
           console.error("Error fetching prescriptions:", err);
-          res.status(500).json({ error: err.message });
         }
         sendToAide(aideId, payload);
       } else {
@@ -493,18 +492,15 @@ mqttClient.on("message", async (topic, messageBuf) => {
     
         if (!response.ok) {
           if (response.status === 404) {
-            return res.json([]); // Pas de médicaments = liste vide
+            console.error("pas de medicaments = liste vide");
           }
-          return res.status(response.status).json({
-            error: "Erreur API",
-          });
+          console.error("erreur : API");
         }
     
         const data = await response.json();
-        res.json(data);
+        console.log("data : ", data);
       } catch (err) {
         console.error("Erreur récupération médicaments:", err);
-        res.status(500).json({ error: err.message });
       }
         sendToAide(aideId, payload);
       } else {
@@ -1516,6 +1512,7 @@ async function shutdown() {
 process.on("SIGINT", shutdown);
 
 process.on("SIGTERM", shutdown);
+
 
 
 
