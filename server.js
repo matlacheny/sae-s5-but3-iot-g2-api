@@ -350,67 +350,166 @@ mqttClient.on("close", () => {
 mqttClient.on("message", async (topic, messageBuf) => {
   const message = messageBuf.toString();
   console.log(`[MQTT] ${topic} -> ${message}`);
-
-  // Pour la partie MECANIQUE
-  try {
-    const data = JSON.parse(message);
-    const aideId = await getAideForPatient(data.id_patient);
-
-    if (data.status === "TECHNIQUE" || data.status === "MECANIQUE") {
-      console.log("\n/!\\ ALERTE MAINTENANCE /!\\");
-      console.log(`📦 Box (Patient) : ${data.id_patient}`);
-      console.log(`🔧 Problème      : ${data.message}`);
-      console.log(`👤 Responsable   : ${aideId ? aideId : "Aucun"}`);
-      console.log("--------------------------------------------------\n");
-      listePannes.unshift({
-        date: new Date().toLocaleString(),
-        box: data.id_patient,
-        probleme: data.message,
-        responsable: aideId || "Non assigné",
-        resolu: false,
-      });
-      if (listePannes.length > 70) listePannes.pop();
-    } else {
-      if (aideId) {
-        console.log(
-          `📨 Envoi info à l'aide-soignant ${aideId} : ${data.status}`
-        );
-        sendToAide(aideId, {
-          type: "box_alert",
-          patientId: data.id_patient,
-          alertType: data.status,
-          message: data.message,
-          timestamp: new Date().toISOString(),
-          severity: data.status === "ALERTE" ? "high" : "info",
-        });
-      } else {
-        console.log(
-          `⚠️ Info reçue (${data.status}) mais aucun aide-soignant assigné.`
-        );
-      }
-    }
-  } catch (e) {
-    console.log("Erreur : ", e);
-  }
-
+  
   const parts = topic.split("/").filter(Boolean);
   if (parts.length >= 4 && parts[0] === "alert" && parts[1] === "box") {
     const patientId = parts[2];
     const alertType = parts.slice(3).join("/");
     const aideId = await getAideForPatient(patientId);
 
-    const payload = {
-      type: "box_alert",
-      patientId,
-      alertType,
-      message,
-      topic,
-    };
+    if (alertType === "mecanic") {
+      console.log("\n/!\\ ALERTE MAINTENANCE /!\\");
+      console.log(`📦 Box (Patient) : ${data.id_patient}`);
+      console.log(`🔧 Problème      : ${data.message}`);
+      console.log(`👤 Responsable   : ${aideId ? aideId : "Aucun"}`);
+      console.log("--------------------------------------------------\n");
+    }else if (alertType === "seuilmedoc") {
+      const payload = {
+        type: "warning",
+        patientId,
+        alertType,
+        message,
+        topic,
+      };
 
-    if (aideId) {
-      sendToAide(aideId, payload);
-    } else {
-      console.log(`No aide-soignant found for patient ${patientId}`);
+      if (aideId) {
+        sendToAide(aideId, payload);
+      } else {
+        console.log(`No aide-soignant found for patient ${patientId}`);
+      }
+    }else if (alertType === "plusmedoc") {
+      const payload = {
+        type: "critical",
+        patientId,
+        alertType,
+        message,
+        topic,
+      };
+
+      if (aideId) {
+        sendToAide(aideId, payload);
+      } else {
+        console.log(`No aide-soignant found for patient ${patientId}`);
+      }
+    }else if (alertType === "delivery") {
+      const data = JSON.parse(message);
+      
+      const payload = {
+        type: "info",
+        patientId,
+        alertType,
+        message,
+        topic,
+      };
+      
+      const heure_distrib = data.heure_distrib;
+      const nom_medoc = data.nom_medoc;
+      const quantite_totale = data.quantite_totale;
+      const quantite_restante = data.quantite_restante;
+      const compartiment = data.compartiment;
+    
+      if (!nom_medoc || !quantite_totale || !quantite_restante || !compartiment) {
+        return res.status(400).json({ error: "Champs obligatoires manquants" });
+      }
+
+      if (aideId) {
+        try {
+          if (!API_BASE) {
+            return res.status(500).json({ error: "API_BASE_URL non configurée" });
+          }
+          const url = `${API_BASE}/prescriptions/${encodeURIComponent(patientId)}`;
+          const r = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              heure_distrib,
+              nom_medoc,
+              quantite_totale,
+              quantite_restante,
+              compartiment,
+            }),
+          });
+      
+          if (!r.ok) {
+            return res.status(r.status).json({ error: await r.text() });
+          }
+          const data = await r.json();
+          res.json({ success: true, data });
+        } catch (err) {
+          console.error("Error posting prescription:", err);
+          res.status(500).json({ error: err.message });
+        }
+        //sendToAide(aideId, payload);
+      } else {
+        console.log(`No aide-soignant found for patient ${patientId}`);
+      }
+    }else if (alertType === "getprescription") {
+      const payload = {
+        type: "request",
+        patientId,
+        alertType,
+        message,
+        topic,
+      };
+
+      if (aideId) {
+        if (!API_BASE)
+          return res.status(500).json({ error: "API_BASE_URL not configured" });
+        try {
+          const url = `${API_BASE}/prescriptions/${encodeURIComponent(patientId)}`;
+          const r = await fetch(url);
+          if (!r.ok) {
+            return res.status(r.status).json({ error: await r.text() });
+          }
+          const data = await r.json();
+          res.json(data);
+        } catch (err) {
+          console.error("Error fetching prescriptions:", err);
+          res.status(500).json({ error: err.message });
+        }
+        sendToAide(aideId, payload);
+      } else {
+        console.log(`No aide-soignant found for patient ${patientId}`);
+      }
+    }else if (alertType === "getmedocs") {
+      const payload = {
+        type: "request",
+        patientId,
+        alertType,
+        message,
+        topic,
+      };
+
+      if (aideId) {
+        try {
+        const url = `${API_BASE}/medocpatients/${encodeURIComponent(patientId)}`;
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            api_key: API_KEY,
+            "Content-Type": "application/json",
+          },
+        });
+    
+        if (!response.ok) {
+          if (response.status === 404) {
+            return res.json([]); // Pas de médicaments = liste vide
+          }
+          return res.status(response.status).json({
+            error: "Erreur API",
+          });
+        }
+    
+        const data = await response.json();
+        res.json(data);
+      } catch (err) {
+        console.error("Erreur récupération médicaments:", err);
+        res.status(500).json({ error: err.message });
+      }
+        sendToAide(aideId, payload);
+      } else {
+        console.log(`No aide-soignant found for patient ${patientId}`);
+      }
     }
   }
 });
@@ -1417,6 +1516,7 @@ async function shutdown() {
 process.on("SIGINT", shutdown);
 
 process.on("SIGTERM", shutdown);
+
 
 
 
