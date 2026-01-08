@@ -1,6 +1,3 @@
-Here is the **README.md** file for the Azure API repository, written in a neutral style with no emojis.
-
----
 
 # Azure Node.js API
 
